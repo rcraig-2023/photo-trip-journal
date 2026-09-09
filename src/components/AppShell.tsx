@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Camera, MapPin, PenLine, Plus, UtensilsCrossed, X } from "lucide-react";
 import { usePendingCount } from "@/lib/touri";
+import { useUploadQueue } from "@/lib/uploadQueue";
 import { cn } from "@/lib/utils";
 
 const ADD_OPTIONS = [
@@ -11,10 +12,19 @@ const ADD_OPTIONS = [
   { kind: "restaurant", label: "Restaurant", hint: "Something you ate", icon: UtensilsCrossed },
 ] as const;
 
+const QUEUE_COPY: Record<string, string> = {
+  preparing: "Preparing photos…",
+  optimizing: "Optimizing photos…",
+  uploading: "Uploading photos…",
+  thinking: "Looking for places…",
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const pending = usePendingCount();
+  const queue = useUploadQueue();
+
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-background">
