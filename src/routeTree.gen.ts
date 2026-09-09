@@ -10,33 +10,154 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as MemoriesRouteImport } from './routes/memories'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TripRouteImport } from './routes/trip'
+import { Route as AddKindRouteImport } from './routes/add.$kind'
+import { Route as AddPhotosRouteImport } from './routes/add.photos'
+import { Route as CityCityIdRouteImport } from './routes/city.$cityId'
+import { Route as EntryEntryIdRouteImport } from './routes/entry.$entryId'
+import { Route as TripsNewRouteImport } from './routes/trips.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemoriesRoute = MemoriesRouteImport.update({
+  id: '/memories',
+  path: '/memories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TripRoute = TripRouteImport.update({
+  id: '/trip',
+  path: '/trip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AddKindRoute = AddKindRouteImport.update({
+  id: '/add/$kind',
+  path: '/add/$kind',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AddPhotosRoute = AddPhotosRouteImport.update({
+  id: '/add/photos',
+  path: '/add/photos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CityCityIdRoute = CityCityIdRouteImport.update({
+  id: '/city/$cityId',
+  path: '/city/$cityId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntryEntryIdRoute = EntryEntryIdRouteImport.update({
+  id: '/entry/$entryId',
+  path: '/entry/$entryId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TripsNewRoute = TripsNewRouteImport.update({
+  id: '/trips/new',
+  path: '/trips/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/memories': typeof MemoriesRoute
+  '/settings': typeof SettingsRoute
+  '/trip': typeof TripRoute
+  '/add/$kind': typeof AddKindRoute
+  '/add/photos': typeof AddPhotosRoute
+  '/city/$cityId': typeof CityCityIdRoute
+  '/entry/$entryId': typeof EntryEntryIdRoute
+  '/trips/new': typeof TripsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/memories': typeof MemoriesRoute
+  '/settings': typeof SettingsRoute
+  '/trip': typeof TripRoute
+  '/add/$kind': typeof AddKindRoute
+  '/add/photos': typeof AddPhotosRoute
+  '/city/$cityId': typeof CityCityIdRoute
+  '/entry/$entryId': typeof EntryEntryIdRoute
+  '/trips/new': typeof TripsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/memories': typeof MemoriesRoute
+  '/settings': typeof SettingsRoute
+  '/trip': typeof TripRoute
+  '/add/$kind': typeof AddKindRoute
+  '/add/photos': typeof AddPhotosRoute
+  '/city/$cityId': typeof CityCityIdRoute
+  '/entry/$entryId': typeof EntryEntryIdRoute
+  '/trips/new': typeof TripsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/memories'
+    | '/settings'
+    | '/trip'
+    | '/add/$kind'
+    | '/add/photos'
+    | '/city/$cityId'
+    | '/entry/$entryId'
+    | '/trips/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/memories'
+    | '/settings'
+    | '/trip'
+    | '/add/$kind'
+    | '/add/photos'
+    | '/city/$cityId'
+    | '/entry/$entryId'
+    | '/trips/new'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/memories'
+    | '/settings'
+    | '/trip'
+    | '/add/$kind'
+    | '/add/photos'
+    | '/city/$cityId'
+    | '/entry/$entryId'
+    | '/trips/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
+  MemoriesRoute: typeof MemoriesRoute
+  SettingsRoute: typeof SettingsRoute
+  TripRoute: typeof TripRoute
+  AddKindRoute: typeof AddKindRoute
+  AddPhotosRoute: typeof AddPhotosRoute
+  CityCityIdRoute: typeof CityCityIdRoute
+  EntryEntryIdRoute: typeof EntryEntryIdRoute
+  TripsNewRoute: typeof TripsNewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +169,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memories': {
+      id: '/memories'
+      path: '/memories'
+      fullPath: '/memories'
+      preLoaderRoute: typeof MemoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trip': {
+      id: '/trip'
+      path: '/trip'
+      fullPath: '/trip'
+      preLoaderRoute: typeof TripRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/add/$kind': {
+      id: '/add/$kind'
+      path: '/add/$kind'
+      fullPath: '/add/$kind'
+      preLoaderRoute: typeof AddKindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/add/photos': {
+      id: '/add/photos'
+      path: '/add/photos'
+      fullPath: '/add/photos'
+      preLoaderRoute: typeof AddPhotosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/city/$cityId': {
+      id: '/city/$cityId'
+      path: '/city/$cityId'
+      fullPath: '/city/$cityId'
+      preLoaderRoute: typeof CityCityIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entry/$entryId': {
+      id: '/entry/$entryId'
+      path: '/entry/$entryId'
+      fullPath: '/entry/$entryId'
+      preLoaderRoute: typeof EntryEntryIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trips/new': {
+      id: '/trips/new'
+      path: '/trips/new'
+      fullPath: '/trips/new'
+      preLoaderRoute: typeof TripsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
+  MemoriesRoute: MemoriesRoute,
+  SettingsRoute: SettingsRoute,
+  TripRoute: TripRoute,
+  AddKindRoute: AddKindRoute,
+  AddPhotosRoute: AddPhotosRoute,
+  CityCityIdRoute: CityCityIdRoute,
+  EntryEntryIdRoute: EntryEntryIdRoute,
+  TripsNewRoute: TripsNewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
