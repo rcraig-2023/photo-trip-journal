@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TripRouteImport } from './routes/trip'
+import { Route as AddKindRouteImport } from './routes/add.$kind'
+import { Route as AddPhotosRouteImport } from './routes/add.photos'
 import { Route as CityCityIdRouteImport } from './routes/city.$cityId'
 import { Route as EntryEntryIdRouteImport } from './routes/entry.$entryId'
 import { Route as TripsNewRouteImport } from './routes/trips.new'
@@ -37,6 +39,16 @@ const TripRoute = TripRouteImport.update({
   path: '/trip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AddKindRoute = AddKindRouteImport.update({
+  id: '/add/$kind',
+  path: '/add/$kind',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AddPhotosRoute = AddPhotosRouteImport.update({
+  id: '/add/photos',
+  path: '/add/photos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CityCityIdRoute = CityCityIdRouteImport.update({
   id: '/city/$cityId',
   path: '/city/$cityId',
@@ -58,6 +70,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
+  '/add/$kind': typeof AddKindRoute
+  '/add/photos': typeof AddPhotosRoute
   '/city/$cityId': typeof CityCityIdRoute
   '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
@@ -67,6 +81,8 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
+  '/add/$kind': typeof AddKindRoute
+  '/add/photos': typeof AddPhotosRoute
   '/city/$cityId': typeof CityCityIdRoute
   '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
@@ -77,6 +93,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
+  '/add/$kind': typeof AddKindRoute
+  '/add/photos': typeof AddPhotosRoute
   '/city/$cityId': typeof CityCityIdRoute
   '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
@@ -88,6 +106,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/settings'
     | '/trip'
+    | '/add/$kind'
+    | '/add/photos'
     | '/city/$cityId'
     | '/entry/$entryId'
     | '/trips/new'
@@ -97,6 +117,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/settings'
     | '/trip'
+    | '/add/$kind'
+    | '/add/photos'
     | '/city/$cityId'
     | '/entry/$entryId'
     | '/trips/new'
@@ -106,6 +128,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/settings'
     | '/trip'
+    | '/add/$kind'
+    | '/add/photos'
     | '/city/$cityId'
     | '/entry/$entryId'
     | '/trips/new'
@@ -116,6 +140,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   SettingsRoute: typeof SettingsRoute
   TripRoute: typeof TripRoute
+  AddKindRoute: typeof AddKindRoute
+  AddPhotosRoute: typeof AddPhotosRoute
   CityCityIdRoute: typeof CityCityIdRoute
   EntryEntryIdRoute: typeof EntryEntryIdRoute
   TripsNewRoute: typeof TripsNewRoute
@@ -151,6 +177,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TripRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/add/$kind': {
+      id: '/add/$kind'
+      path: '/add/$kind'
+      fullPath: '/add/$kind'
+      preLoaderRoute: typeof AddKindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/add/photos': {
+      id: '/add/photos'
+      path: '/add/photos'
+      fullPath: '/add/photos'
+      preLoaderRoute: typeof AddPhotosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/city/$cityId': {
       id: '/city/$cityId'
       path: '/city/$cityId'
@@ -180,6 +220,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   SettingsRoute: SettingsRoute,
   TripRoute: TripRoute,
+  AddKindRoute: AddKindRoute,
+  AddPhotosRoute: AddPhotosRoute,
   CityCityIdRoute: CityCityIdRoute,
   EntryEntryIdRoute: EntryEntryIdRoute,
   TripsNewRoute: TripsNewRoute,
