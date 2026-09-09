@@ -37,12 +37,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <ul className="mt-3">
             {ADD_OPTIONS.map((o) => (
-              <li key={o.to} className="hairline">
+              <li key={o.kind} className="hairline">
                 <button
                   className="flex w-full items-center gap-4 py-4 text-left"
                   onClick={() => {
                     setOpen(false);
-                    navigate({ to: o.to });
+                    if (o.kind === "photos") navigate({ to: "/add/photos" });
+                    else navigate({ to: "/add/$kind", params: { kind: o.kind } });
                   }}
                 >
                   <o.icon className="size-5 text-accent" strokeWidth={1.5} />
