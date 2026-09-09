@@ -32,9 +32,16 @@ export type Entry = {
   place_name: string | null;
   occurred_at: string;
   status: string;
+  landmark_id: string | null;
+  ai_status: string;
   ai_suggestion: string | null;
-  entry_photos?: { id: string; storage_path: string }[];
+  ai_place: string | null;
+  ai_explanation: string | null;
+  ai_confidence: number | null;
+  ai_error: string | null;
+  entry_photos?: { id: string; storage_path: string; sha256: string | null }[];
 };
+
 
 export const KIND_LABEL: Record<Kind, string> = {
   photo: "Photos",
@@ -123,7 +130,7 @@ export function useCity(cityId?: string) {
   });
 }
 
-const ENTRY_SELECT = "*, entry_photos(id, storage_path)";
+const ENTRY_SELECT = "*, entry_photos(id, storage_path, sha256)";
 
 export function useEntries(opts: {
   cityId?: string | null | undefined;
@@ -170,14 +177,28 @@ export function useEntry(id?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entries")
-        .select(ENTRY_SELECT + ", cities(name, country)")
+        .select(ENTRY_SELECT + ", cities(name, country), landmarks(*)")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
-      return data as unknown as (Entry & { cities: { name: string; country: string | null } | null }) | null;
+      return data as unknown as
+        | (Entry & {
+            cities: { name: string; country: string | null } | null;
+            landmarks: {
+              name: string;
+              place_name: string | null;
+              description: string | null;
+              history: string | null;
+              culture: string | null;
+              fun_fact: string | null;
+              caption: string | null;
+            } | null;
+          })
+        | null;
     },
   });
 }
+
 
 const urlCache = new Map<string, string>();
 

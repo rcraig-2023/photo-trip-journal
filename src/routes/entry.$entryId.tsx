@@ -102,6 +102,31 @@ function EntryPage() {
           </div>
         )}
 
+        {e.landmarks && (e.landmarks.description || e.landmarks.history) && (
+          <section className="mt-10 border-t border-rule pt-6">
+            <span className="eyebrow">About {e.landmarks.name}</span>
+            {e.landmarks.description && (
+              <p className="mt-3 text-[1.02rem] leading-relaxed">{e.landmarks.description}</p>
+            )}
+            {e.landmarks.history && (
+              <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                {e.landmarks.history}
+              </p>
+            )}
+            {e.landmarks.culture && (
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                {e.landmarks.culture}
+              </p>
+            )}
+            {e.landmarks.fun_fact && (
+              <p className="mt-4 border-l-2 border-accent pl-4 text-sm leading-relaxed">
+                {e.landmarks.fun_fact}
+              </p>
+            )}
+          </section>
+        )}
+
+
         <div className="mt-10 flex items-center gap-6">
           <button
             onClick={save}
