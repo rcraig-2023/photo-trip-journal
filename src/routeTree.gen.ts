@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as MemoriesRouteImport } from './routes/memories'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TripRouteImport } from './routes/trip'
 import { Route as AddKindRouteImport } from './routes/add.$kind'
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemoriesRoute = MemoriesRouteImport.update({
+  id: '/memories',
+  path: '/memories',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -68,6 +74,7 @@ const TripsNewRoute = TripsNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/memories': typeof MemoriesRoute
   '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
   '/add/$kind': typeof AddKindRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/memories': typeof MemoriesRoute
   '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
   '/add/$kind': typeof AddKindRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/memories': typeof MemoriesRoute
   '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
   '/add/$kind': typeof AddKindRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/memories'
     | '/settings'
     | '/trip'
     | '/add/$kind'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/memories'
     | '/settings'
     | '/trip'
     | '/add/$kind'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
+    | '/memories'
     | '/settings'
     | '/trip'
     | '/add/$kind'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  MemoriesRoute: typeof MemoriesRoute
   SettingsRoute: typeof SettingsRoute
   TripRoute: typeof TripRoute
   AddKindRoute: typeof AddKindRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/memories': {
+      id: '/memories'
+      path: '/memories'
+      fullPath: '/memories'
+      preLoaderRoute: typeof MemoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  MemoriesRoute: MemoriesRoute,
   SettingsRoute: SettingsRoute,
   TripRoute: TripRoute,
   AddKindRoute: AddKindRoute,
