@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,9 @@ import { useActiveTrip, useCities, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/add/$kind")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    city: typeof search["city"] === "string" ? (search["city"] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "New entry — Touri" },
@@ -32,26 +35,50 @@ const COPY: Record<string, { heading: string; titlePh: string; bodyPh: string }>
   restaurant: { heading: "A restaurant", titlePh: "Dishoom", bodyPh: "What you ate…" },
 };
 
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function toLocalInput(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function nowLocal() {
+  return toLocalInput(new Date());
+}
+
 function AddEntry() {
   const { kind } = Route.useParams();
+  const { city: cityParam } = Route.useSearch();
   const k: Kind = kind === "landmark" || kind === "restaurant" ? kind : "jot";
   const copy = COPY[k]!;
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
-  const [cityId, setCityId] = useState<string | null>(null);
+  const [cityId, setCityId] = useState<string | null>(cityParam ?? null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [when, setWhen] = useState(nowLocal);
   const [busy, setBusy] = useState(false);
+  const touchedWhen = useRef(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
   const chosenCity = cityId ?? cities.data?.[0]?.id ?? null;
+  const city = cities.data?.find((c) => c.id === chosenCity) ?? null;
+
+  // While reading a city chapter, start the clock at that chapter's first day.
+  useEffect(() => {
+    if (touchedWhen.current) return;
+    if (city?.start_date) setWhen(`${city.start_date}T12:00`);
+    else setWhen(nowLocal());
+  }, [city?.start_date]);
 
   async function save() {
     const { data: auth } = await supabase.auth.getUser();
     const uid = auth.user?.id;
     if (!uid) return;
     setBusy(true);
+    const occurred = when ? new Date(when) : new Date();
     const { error } = await supabase.from("entries").insert({
       user_id: uid,
       trip_id: trip?.id ?? null,
@@ -60,7 +87,7 @@ function AddEntry() {
       title: title.trim() || null,
       body: body.trim() || null,
       status: "confirmed",
-      occurred_at: new Date().toISOString(),
+      occurred_at: (isNaN(occurred.getTime()) ? new Date() : occurred).toISOString(),
     });
     setBusy(false);
     if (error) {
@@ -94,6 +121,17 @@ function AddEntry() {
             ? "font-[var(--font-display)] text-2xl leading-snug placeholder:text-muted-foreground/40"
             : "text-[1.05rem] leading-relaxed",
         )}
+      />
+
+      <h2 className="eyebrow mt-8">When</h2>
+      <input
+        type="datetime-local"
+        value={when}
+        onChange={(e) => {
+          touchedWhen.current = true;
+          setWhen(e.target.value);
+        }}
+        className="mt-2 w-full border-b border-rule bg-transparent pb-2 outline-none"
       />
 
       <h2 className="eyebrow mt-8">City</h2>

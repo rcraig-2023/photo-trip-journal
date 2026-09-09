@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
+import { CityAutocomplete } from "@/components/CityAutocomplete";
 
 export const Route = createFileRoute("/trips/new")({
   head: () => ({
@@ -116,24 +117,26 @@ function NewTrip() {
       <h2 className="eyebrow mt-12">Cities</h2>
       {rows.map((r, i) => (
         <div key={i} className="hairline mt-4 pt-4">
-          <div className="flex gap-4">
-            <input
-              value={r.name}
-              onChange={(e) =>
-                setRows(rows.map((x, j) => (i === j ? { ...x, name: e.target.value } : x)))
-              }
-              placeholder="London"
-              className="display flex-1 bg-transparent text-2xl outline-none placeholder:text-muted-foreground/40"
-            />
-            <input
-              value={r.country}
-              onChange={(e) =>
-                setRows(rows.map((x, j) => (i === j ? { ...x, country: e.target.value } : x)))
-              }
-              placeholder="United Kingdom"
-              className="w-40 bg-transparent text-right text-sm text-muted-foreground outline-none"
-            />
-          </div>
+          <CityAutocomplete
+            value={r.name}
+            onChange={(v) =>
+              setRows(rows.map((x, j) => (i === j ? { ...x, name: v, country: "" } : x)))
+            }
+            onPick={(hit) =>
+              setRows(
+                rows.map((x, j) =>
+                  i === j ? { ...x, name: hit.name, country: hit.country ?? "" } : x,
+                ),
+              )
+            }
+            placeholder="London"
+            className="display w-full bg-transparent text-2xl outline-none placeholder:text-muted-foreground/40"
+          />
+          {r.country && (
+            <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              {r.country}
+            </p>
+          )}
           <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
             <input
               type="date"
