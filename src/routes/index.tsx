@@ -130,7 +130,7 @@ function Today() {
                       )}
                       {!!e.entry_photos?.length && (
                         <Photo
-                          path={e.entry_photos[0].storage_path}
+                          path={e.entry_photos[0]?.storage_path}
                           alt={e.title ?? "Memory"}
                           className={
                             i % 3 === 0

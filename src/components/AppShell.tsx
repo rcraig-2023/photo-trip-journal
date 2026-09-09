@@ -5,10 +5,10 @@ import { usePendingCount } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 const ADD_OPTIONS = [
-  { to: "/add/photos", label: "Photos", hint: "Pick from your camera roll", icon: Camera },
-  { to: "/add/jot", label: "Jot", hint: "A few lines, right now", icon: PenLine },
-  { to: "/add/landmark", label: "Landmark", hint: "A place you stood in front of", icon: MapPin },
-  { to: "/add/restaurant", label: "Restaurant", hint: "Something you ate", icon: UtensilsCrossed },
+  { kind: "photos", label: "Photos", hint: "Pick from your camera roll", icon: Camera },
+  { kind: "jot", label: "Jot", hint: "A few lines, right now", icon: PenLine },
+  { kind: "landmark", label: "Landmark", hint: "A place you stood in front of", icon: MapPin },
+  { kind: "restaurant", label: "Restaurant", hint: "Something you ate", icon: UtensilsCrossed },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {

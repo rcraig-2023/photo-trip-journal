@@ -148,7 +148,7 @@ function MemoriesPage() {
                   )}
                   {!!e.entry_photos?.length && (
                     <Photo
-                      path={e.entry_photos[0].storage_path}
+                      path={e.entry_photos[0]?.storage_path}
                       alt={e.title ?? "Memory"}
                       className={cn("mt-3 w-full", i % 4 === 0 ? "aspect-[4/5]" : "aspect-[3/2]")}
                     />

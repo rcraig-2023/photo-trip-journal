@@ -126,10 +126,10 @@ export function useCity(cityId?: string) {
 const ENTRY_SELECT = "*, entry_photos(id, storage_path)";
 
 export function useEntries(opts: {
-  cityId?: string | null;
-  tripId?: string | null;
-  status?: string;
-  limit?: number;
+  cityId?: string | null | undefined;
+  tripId?: string | null | undefined;
+  status?: string | undefined;
+  limit?: number | undefined;
 }) {
   const { cityId, tripId, status, limit } = opts;
   return useQuery({

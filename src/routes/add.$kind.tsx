@@ -35,7 +35,7 @@ const COPY: Record<string, { heading: string; titlePh: string; bodyPh: string }>
 function AddEntry() {
   const { kind } = Route.useParams();
   const k: Kind = kind === "landmark" || kind === "restaurant" ? kind : "jot";
-  const copy = COPY[k];
+  const copy = COPY[k]!;
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
   const [cityId, setCityId] = useState<string | null>(null);
@@ -63,7 +63,10 @@ function AddEntry() {
       occurred_at: new Date().toISOString(),
     });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     await qc.invalidateQueries();
     if (chosenCity) navigate({ to: "/city/$cityId", params: { cityId: chosenCity } });
     else navigate({ to: "/" });
