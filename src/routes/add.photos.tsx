@@ -1,14 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { useActiveTrip, useCities } from "@/lib/touri";
+import { enqueuePhotos, onQueueChange, useUploadQueue } from "@/lib/uploadQueue";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/add/photos")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    city: typeof search["city"] === "string" ? (search["city"] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Add photos — Touri" },
@@ -32,62 +36,42 @@ export const Route = createFileRoute("/add/photos")({
   ),
 });
 
+const PHASE_COPY: Record<string, string> = {
+  preparing: "Preparing photos…",
+  optimizing: "Optimizing photos…",
+  uploading: "Uploading photos…",
+  thinking: "Looking for places…",
+};
+
 function AddPhotos() {
+  const { city: cityFromContext } = Route.useSearch();
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
-  const [cityId, setCityId] = useState<string | null>(null);
+  const [cityId, setCityId] = useState<string | null>(cityFromContext ?? null);
   const [files, setFiles] = useState<File[]>([]);
-  const [done, setDone] = useState(0);
-  const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const queue = useUploadQueue();
 
-  const chosenCity = cityId ?? cities.data?.[0]?.id ?? null;
+  useEffect(() => {
+    onQueueChange(() => qc.invalidateQueries());
+  }, [qc]);
 
-  async function upload() {
+  const chosenCity = cityId ?? cityFromContext ?? cities.data?.[0]?.id ?? null;
+  const previews = useMemo(() => files.slice(0, 9).map((f) => URL.createObjectURL(f)), [files]);
+
+  async function start() {
     if (!files.length) return;
     const { data: auth } = await supabase.auth.getUser();
     const uid = auth.user?.id;
     if (!uid) return;
-    setBusy(true);
-    setDone(0);
-
-    for (const file of files) {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `${uid}/${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("memories").upload(path, file, {
-        contentType: file.type || "image/jpeg",
-        upsert: false,
-      });
-      if (upErr) {
-        toast.error(upErr.message);
-        continue;
-      }
-      const { data: entry } = await supabase
-        .from("entries")
-        .insert({
-          user_id: uid,
-          trip_id: trip?.id ?? null,
-          city_id: chosenCity,
-          kind: "photo",
-          status: "pending",
-          occurred_at: new Date(file.lastModified || Date.now()).toISOString(),
-        })
-        .select()
-        .single();
-      if (entry) {
-        await supabase
-          .from("entry_photos")
-          .insert({ user_id: uid, entry_id: entry.id, storage_path: path });
-      }
-      setDone((d) => d + 1);
-    }
-
-    await qc.invalidateQueries();
-    setBusy(false);
-    toast.success("Filed into New memories.");
+    const batch = files;
+    setFiles([]);
+    toast.success(`${batch.length} photo${batch.length > 1 ? "s" : ""} on their way — keep browsing.`);
     navigate({ to: "/memories" });
+    await enqueuePhotos(batch, { userId: uid, tripId: trip?.id ?? null, cityId: chosenCity });
+    qc.invalidateQueries();
   }
 
   return (
@@ -95,8 +79,8 @@ function AddPhotos() {
       <span className="eyebrow">Add</span>
       <h1 className="display mt-5 text-[2.8rem]">Photos from your phone</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        Select as many as you like. Touri sorts them by the time they were taken and drops them into
-        New memories for you to confirm.
+        Select as many as you like. Touri shrinks them so they travel light, sorts them by the time
+        they were taken, and files them in New memories. You can leave this screen while it works.
       </p>
 
       <h2 className="eyebrow mt-10">City</h2>
@@ -133,25 +117,26 @@ function AddPhotos() {
         {files.length ? `${files.length} photos selected — change` : "Choose photos"}
       </button>
 
-      {!!files.length && (
+      {!!previews.length && (
         <div className="mt-4 grid grid-cols-3 gap-1">
-          {files.slice(0, 9).map((f, i) => (
-            <img
-              key={i}
-              src={URL.createObjectURL(f)}
-              alt=""
-              className="aspect-square w-full object-cover"
-            />
+          {previews.map((src, i) => (
+            <img key={i} src={src} alt="" className="aspect-square w-full object-cover" />
           ))}
         </div>
       )}
 
+      {queue.running && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          {PHASE_COPY[queue.phase] ?? "Working…"} {queue.uploaded}/{queue.total}
+        </p>
+      )}
+
       <button
-        disabled={!files.length || busy}
-        onClick={upload}
+        disabled={!files.length || queue.running}
+        onClick={start}
         className="mt-8 w-full bg-primary py-4 text-xs uppercase tracking-[0.18em] text-primary-foreground disabled:opacity-40"
       >
-        {busy ? `Uploading ${done}/${files.length}…` : "Upload"}
+        {queue.running ? "Working…" : "Upload"}
       </button>
     </div>
   );
