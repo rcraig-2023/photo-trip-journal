@@ -14,7 +14,205 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cities: {
+        Row: {
+          country: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          sort_order: number
+          start_date: string | null
+          trip_id: string
+          user_id: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          start_date?: string | null
+          trip_id: string
+          user_id: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          start_date?: string | null
+          trip_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cities_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entries: {
+        Row: {
+          ai_confidence: number | null
+          ai_suggestion: string | null
+          body: string | null
+          city_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          occurred_at: string
+          place_name: string | null
+          status: string
+          title: string | null
+          trip_id: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_suggestion?: string | null
+          body?: string | null
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          occurred_at?: string
+          place_name?: string | null
+          status?: string
+          title?: string | null
+          trip_id?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_suggestion?: string | null
+          body?: string | null
+          city_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          occurred_at?: string
+          place_name?: string | null
+          status?: string
+          title?: string | null
+          trip_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entries_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entries_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entry_photos: {
+        Row: {
+          created_at: string
+          entry_id: string
+          height: number | null
+          id: string
+          storage_path: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          entry_id: string
+          height?: number | null
+          id?: string
+          storage_path: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          entry_id?: string
+          height?: number | null
+          id?: string
+          storage_path?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entry_photos_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      trips: {
+        Row: {
+          cover_path: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          is_active: boolean
+          start_date: string | null
+          subtitle: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          cover_path?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          start_date?: string | null
+          subtitle?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          cover_path?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          start_date?: string | null
+          subtitle?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
