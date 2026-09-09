@@ -130,7 +130,7 @@ export function useCity(cityId?: string) {
   });
 }
 
-const ENTRY_SELECT = "*, entry_photos(id, storage_path)";
+const ENTRY_SELECT = "*, entry_photos(id, storage_path, sha256)";
 
 export function useEntries(opts: {
   cityId?: string | null | undefined;
