@@ -52,7 +52,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className="flex w-full items-center gap-4 py-4 text-left"
                   onClick={() => {
                     setOpen(false);
-                    if (o.kind === "photos") navigate({ to: "/add/photos" });
+                    if (o.kind === "photos")
+                      navigate({ to: "/add/photos", search: { city: undefined } });
+
                     else navigate({ to: "/add/$kind", params: { kind: o.kind } });
                   }}
                 >
