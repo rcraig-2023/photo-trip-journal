@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_image_results: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          explanation: string | null
+          id: string
+          image_hash: string
+          kind: string
+          name: string | null
+          place_name: string | null
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          image_hash: string
+          kind?: string
+          name?: string | null
+          place_name?: string | null
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          image_hash?: string
+          kind?: string
+          name?: string | null
+          place_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           country: string | null
@@ -65,6 +101,8 @@ export type Database = {
         Row: {
           ai_confidence: number | null
           ai_error: string | null
+          ai_explanation: string | null
+          ai_place: string | null
           ai_processed_at: string | null
           ai_status: string
           ai_suggestion: string | null
@@ -73,6 +111,7 @@ export type Database = {
           created_at: string
           id: string
           kind: string
+          landmark_id: string | null
           occurred_at: string
           place_name: string | null
           status: string
@@ -84,6 +123,8 @@ export type Database = {
         Insert: {
           ai_confidence?: number | null
           ai_error?: string | null
+          ai_explanation?: string | null
+          ai_place?: string | null
           ai_processed_at?: string | null
           ai_status?: string
           ai_suggestion?: string | null
@@ -92,6 +133,7 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          landmark_id?: string | null
           occurred_at?: string
           place_name?: string | null
           status?: string
@@ -103,6 +145,8 @@ export type Database = {
         Update: {
           ai_confidence?: number | null
           ai_error?: string | null
+          ai_explanation?: string | null
+          ai_place?: string | null
           ai_processed_at?: string | null
           ai_status?: string
           ai_suggestion?: string | null
@@ -111,6 +155,7 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          landmark_id?: string | null
           occurred_at?: string
           place_name?: string | null
           status?: string
@@ -128,6 +173,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "entries_landmark_id_fkey"
+            columns: ["landmark_id"]
+            isOneToOne: false
+            referencedRelation: "landmarks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "entries_trip_id_fkey"
             columns: ["trip_id"]
             isOneToOne: false
@@ -138,28 +190,46 @@ export type Database = {
       }
       entry_photos: {
         Row: {
+          bytes: number | null
+          captured_at: string | null
           created_at: string
           entry_id: string
           height: number | null
           id: string
+          lat: number | null
+          lng: number | null
+          mime: string | null
+          sha256: string | null
           storage_path: string
           user_id: string
           width: number | null
         }
         Insert: {
+          bytes?: number | null
+          captured_at?: string | null
           created_at?: string
           entry_id: string
           height?: number | null
           id?: string
+          lat?: number | null
+          lng?: number | null
+          mime?: string | null
+          sha256?: string | null
           storage_path: string
           user_id: string
           width?: number | null
         }
         Update: {
+          bytes?: number | null
+          captured_at?: string | null
           created_at?: string
           entry_id?: string
           height?: number | null
           id?: string
+          lat?: number | null
+          lng?: number | null
+          mime?: string | null
+          sha256?: string | null
           storage_path?: string
           user_id?: string
           width?: number | null
@@ -170,6 +240,72 @@ export type Database = {
             columns: ["entry_id"]
             isOneToOne: false
             referencedRelation: "entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      landmarks: {
+        Row: {
+          caption: string | null
+          city_id: string | null
+          created_at: string
+          culture: string | null
+          description: string | null
+          enriched_at: string | null
+          fun_fact: string | null
+          history: string | null
+          id: string
+          name: string
+          place_name: string | null
+          trip_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          city_id?: string | null
+          created_at?: string
+          culture?: string | null
+          description?: string | null
+          enriched_at?: string | null
+          fun_fact?: string | null
+          history?: string | null
+          id?: string
+          name: string
+          place_name?: string | null
+          trip_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          city_id?: string | null
+          created_at?: string
+          culture?: string | null
+          description?: string | null
+          enriched_at?: string | null
+          fun_fact?: string | null
+          history?: string | null
+          id?: string
+          name?: string
+          place_name?: string | null
+          trip_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landmarks_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landmarks_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
             referencedColumns: ["id"]
           },
         ]
