@@ -11,7 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TripRouteImport } from './routes/trip'
+import { Route as CityCityIdRouteImport } from './routes/city.$cityId'
+import { Route as EntryEntryIdRouteImport } from './routes/entry.$entryId'
 import { Route as TripsNewRouteImport } from './routes/trips.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,9 +27,24 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TripRoute = TripRouteImport.update({
   id: '/trip',
   path: '/trip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CityCityIdRoute = CityCityIdRouteImport.update({
+  id: '/city/$cityId',
+  path: '/city/$cityId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntryEntryIdRoute = EntryEntryIdRouteImport.update({
+  id: '/entry/$entryId',
+  path: '/entry/$entryId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TripsNewRoute = TripsNewRouteImport.update({
@@ -38,34 +56,68 @@ const TripsNewRoute = TripsNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
+  '/city/$cityId': typeof CityCityIdRoute
+  '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
+  '/city/$cityId': typeof CityCityIdRoute
+  '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/settings': typeof SettingsRoute
   '/trip': typeof TripRoute
+  '/city/$cityId': typeof CityCityIdRoute
+  '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/trip' | '/trips/new'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/settings'
+    | '/trip'
+    | '/city/$cityId'
+    | '/entry/$entryId'
+    | '/trips/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/trip' | '/trips/new'
-  id: '__root__' | '/' | '/auth' | '/trip' | '/trips/new'
+  to:
+    | '/'
+    | '/auth'
+    | '/settings'
+    | '/trip'
+    | '/city/$cityId'
+    | '/entry/$entryId'
+    | '/trips/new'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/settings'
+    | '/trip'
+    | '/city/$cityId'
+    | '/entry/$entryId'
+    | '/trips/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  SettingsRoute: typeof SettingsRoute
   TripRoute: typeof TripRoute
+  CityCityIdRoute: typeof CityCityIdRoute
+  EntryEntryIdRoute: typeof EntryEntryIdRoute
   TripsNewRoute: typeof TripsNewRoute
 }
 
@@ -85,11 +137,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trip': {
       id: '/trip'
       path: '/trip'
       fullPath: '/trip'
       preLoaderRoute: typeof TripRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/city/$cityId': {
+      id: '/city/$cityId'
+      path: '/city/$cityId'
+      fullPath: '/city/$cityId'
+      preLoaderRoute: typeof CityCityIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entry/$entryId': {
+      id: '/entry/$entryId'
+      path: '/entry/$entryId'
+      fullPath: '/entry/$entryId'
+      preLoaderRoute: typeof EntryEntryIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trips/new': {
@@ -105,7 +178,10 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  SettingsRoute: SettingsRoute,
   TripRoute: TripRoute,
+  CityCityIdRoute: CityCityIdRoute,
+  EntryEntryIdRoute: EntryEntryIdRoute,
   TripsNewRoute: TripsNewRoute,
 }
 export const routeTree = rootRouteImport
