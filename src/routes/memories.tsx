@@ -1,23 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
-import { identifyLandmark } from "@/lib/ai.functions";
-import {
-  fmtTime,
-  signedUrl,
-  useActiveTrip,
-  useCities,
-  useEntries,
-  type Entry,
-  type Kind,
-} from "@/lib/touri";
+import { ensureEnrichment, findOrCreateLandmark } from "@/lib/landmarks";
+import { retryRecognition } from "@/lib/uploadQueue";
+import { fmtTime, useActiveTrip, useCities, useEntries, type Entry, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/memories")({
@@ -52,17 +44,6 @@ const FILTERS: { key: Kind | "all"; label: string }[] = [
   { key: "restaurant", label: "Restaurants" },
 ];
 
-async function toDataUrl(path: string) {
-  const url = await signedUrl(path);
-  const blob = await fetch(url).then((r) => r.blob());
-  const bitmap = await createImageBitmap(blob);
-  const scale = Math.min(1, 768 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.8);
-}
 
 function MemoriesPage() {
   const { trip } = useActiveTrip();

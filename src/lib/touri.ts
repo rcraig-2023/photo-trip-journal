@@ -32,9 +32,16 @@ export type Entry = {
   place_name: string | null;
   occurred_at: string;
   status: string;
+  landmark_id: string | null;
+  ai_status: string;
   ai_suggestion: string | null;
-  entry_photos?: { id: string; storage_path: string }[];
+  ai_place: string | null;
+  ai_explanation: string | null;
+  ai_confidence: number | null;
+  ai_error: string | null;
+  entry_photos?: { id: string; storage_path: string; sha256: string | null }[];
 };
+
 
 export const KIND_LABEL: Record<Kind, string> = {
   photo: "Photos",
