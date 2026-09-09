@@ -24,6 +24,7 @@ export type Database = {
           sort_order: number
           start_date: string | null
           trip_id: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           sort_order?: number
           start_date?: string | null
           trip_id: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           sort_order?: number
           start_date?: string | null
           trip_id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -61,6 +64,9 @@ export type Database = {
       entries: {
         Row: {
           ai_confidence: number | null
+          ai_error: string | null
+          ai_processed_at: string | null
+          ai_status: string
           ai_suggestion: string | null
           body: string | null
           city_id: string | null
@@ -72,10 +78,14 @@ export type Database = {
           status: string
           title: string | null
           trip_id: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
           ai_confidence?: number | null
+          ai_error?: string | null
+          ai_processed_at?: string | null
+          ai_status?: string
           ai_suggestion?: string | null
           body?: string | null
           city_id?: string | null
@@ -87,10 +97,14 @@ export type Database = {
           status?: string
           title?: string | null
           trip_id?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
           ai_confidence?: number | null
+          ai_error?: string | null
+          ai_processed_at?: string | null
+          ai_status?: string
           ai_suggestion?: string | null
           body?: string | null
           city_id?: string | null
@@ -102,6 +116,7 @@ export type Database = {
           status?: string
           title?: string | null
           trip_id?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -164,16 +179,19 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           id: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
           display_name?: string | null
           id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -187,6 +205,7 @@ export type Database = {
           start_date: string | null
           subtitle: string | null
           title: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -198,6 +217,7 @@ export type Database = {
           start_date?: string | null
           subtitle?: string | null
           title: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -209,6 +229,7 @@ export type Database = {
           start_date?: string | null
           subtitle?: string | null
           title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

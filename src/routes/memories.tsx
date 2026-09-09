@@ -182,6 +182,10 @@ function InboxItem({ entry }: { entry: Entry }) {
   async function ask() {
     if (!photo) return;
     setThinking(true);
+    await supabase
+      .from("entries")
+      .update({ ai_status: "processing", ai_error: null })
+      .eq("id", entry.id);
     try {
       const result = await identify({ data: { imageDataUrl: await toDataUrl(photo) } });
       if (!result.name) toast("Touri couldn't place this one — name it yourself.");
@@ -189,12 +193,33 @@ function InboxItem({ entry }: { entry: Entry }) {
         setSuggestion(result.name);
         setKind(result.kind === "photo" ? "photo" : result.kind);
       }
+      await supabase
+        .from("entries")
+        .update({
+          ai_status: "done",
+          ai_processed_at: new Date().toISOString(),
+          ai_suggestion: result.name ?? null,
+          ai_confidence: result.confidence ?? null,
+          place_name: result.place ?? entry.place_name,
+          ai_error: null,
+        })
+        .eq("id", entry.id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "AI could not run.");
+      const message = err instanceof Error ? err.message : "AI could not run.";
+      toast.error(message);
+      await supabase
+        .from("entries")
+        .update({
+          ai_status: "failed",
+          ai_processed_at: new Date().toISOString(),
+          ai_error: message,
+        })
+        .eq("id", entry.id);
     } finally {
       setThinking(false);
     }
   }
+
 
   async function confirm() {
     await supabase
