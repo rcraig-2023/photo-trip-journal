@@ -177,14 +177,28 @@ export function useEntry(id?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entries")
-        .select(ENTRY_SELECT + ", cities(name, country)")
+        .select(ENTRY_SELECT + ", cities(name, country), landmarks(*)")
         .eq("id", id!)
         .maybeSingle();
       if (error) throw error;
-      return data as unknown as (Entry & { cities: { name: string; country: string | null } | null }) | null;
+      return data as unknown as
+        | (Entry & {
+            cities: { name: string; country: string | null } | null;
+            landmarks: {
+              name: string;
+              place_name: string | null;
+              description: string | null;
+              history: string | null;
+              culture: string | null;
+              fun_fact: string | null;
+              caption: string | null;
+            } | null;
+          })
+        | null;
     },
   });
 }
+
 
 const urlCache = new Map<string, string>();
 
