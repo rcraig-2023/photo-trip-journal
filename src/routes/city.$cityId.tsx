@@ -67,7 +67,15 @@ function CityPage() {
           {city.data?.country ? `${city.data.country} · ` : ""}
           {fmtRange(city.data?.start_date, city.data?.end_date)}
         </p>
+        <Link
+          to="/add/photos"
+          search={{ city: cityId }}
+          className="mt-4 inline-block text-xs uppercase tracking-[0.14em] text-accent"
+        >
+          + Add photos here
+        </Link>
       </header>
+
 
       <div className="mt-8 flex gap-5 overflow-x-auto border-y border-rule px-6 py-3 text-xs uppercase tracking-[0.14em]">
         {FILTERS.map((f) => (
