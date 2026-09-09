@@ -170,69 +170,65 @@ function InboxItem({ entry }: { entry: Entry }) {
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
   const qc = useQueryClient();
-  const identify = useServerFn(identifyLandmark);
   const [title, setTitle] = useState(entry.title ?? "");
   const [kind, setKind] = useState<Kind>(entry.kind);
   const [cityId, setCityId] = useState<string | null>(entry.city_id);
-  const [thinking, setThinking] = useState(false);
-  const [suggestion, setSuggestion] = useState<string | null>(entry.ai_suggestion);
+  const [busy, setBusy] = useState(false);
+  const [rejected, setRejected] = useState(false);
+  const [editing, setEditing] = useState(false);
 
-  const photo = entry.entry_photos?.[0]?.storage_path;
+  const photo = entry.entry_photos?.[0];
+  const suggestion = entry.ai_suggestion;
+  const percent = Math.round((entry.ai_confidence ?? 0) * 100);
+  const running = entry.ai_status === "processing";
 
-  async function ask() {
+  async function retry() {
     if (!photo) return;
-    setThinking(true);
-    await supabase
-      .from("entries")
-      .update({ ai_status: "processing", ai_error: null })
-      .eq("id", entry.id);
-    try {
-      const result = await identify({ data: { imageDataUrl: await toDataUrl(photo) } });
-      if (!result.name) toast("Touri couldn't place this one — name it yourself.");
-      else {
-        setSuggestion(result.name);
-        setKind(result.kind === "photo" ? "photo" : result.kind);
-      }
-      await supabase
-        .from("entries")
-        .update({
-          ai_status: "done",
-          ai_processed_at: new Date().toISOString(),
-          ai_suggestion: result.name ?? null,
-          ai_confidence: result.confidence ?? null,
-          place_name: result.place ?? entry.place_name,
-          ai_error: null,
-        })
-        .eq("id", entry.id);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "AI could not run.";
-      toast.error(message);
-      await supabase
-        .from("entries")
-        .update({
-          ai_status: "failed",
-          ai_processed_at: new Date().toISOString(),
-          ai_error: message,
-        })
-        .eq("id", entry.id);
-    } finally {
-      setThinking(false);
-    }
+    setBusy(true);
+    await retryRecognition(entry.id, photo.storage_path, photo.sha256 ?? null);
+    await qc.invalidateQueries();
+    setBusy(false);
   }
 
+  async function confirm(useSuggestion: boolean) {
+    setBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return;
+      const finalName = useSuggestion ? (suggestion ?? title) : title;
+      const finalKind: Kind = useSuggestion && suggestion ? "landmark" : kind;
+      let landmarkId: string | null = null;
 
-  async function confirm() {
-    await supabase
-      .from("entries")
-      .update({
-        title: (title || suggestion || null) as string | null,
-        kind,
-        city_id: cityId,
-        status: "confirmed",
-        ai_suggestion: suggestion,
-      })
-      .eq("id", entry.id);
-    qc.invalidateQueries();
+      if (finalKind === "landmark" && finalName) {
+        const landmark = await findOrCreateLandmark({
+          userId: uid,
+          name: finalName,
+          placeName: entry.ai_place ?? null,
+          tripId: entry.trip_id,
+          cityId,
+        });
+        landmarkId = landmark.id;
+        void ensureEnrichment(landmark).then(() => qc.invalidateQueries());
+      }
+
+      await supabase
+        .from("entries")
+        .update({
+          title: finalName || null,
+          kind: finalKind,
+          city_id: cityId,
+          status: "confirmed",
+          landmark_id: landmarkId,
+          place_name: entry.ai_place ?? entry.place_name,
+        })
+        .eq("id", entry.id);
+      await qc.invalidateQueries();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save that.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function discard() {
@@ -242,68 +238,136 @@ function InboxItem({ entry }: { entry: Entry }) {
 
   return (
     <li className="border-t border-rule px-6 py-6">
-      {photo && <Photo path={photo} alt="New memory" className="aspect-[4/5] w-full" />}
+      {photo && <Photo path={photo.storage_path} alt="New memory" className="aspect-[4/5] w-full" />}
       <span className="timecode mt-3 block">
         {new Date(entry.occurred_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
         · {fmtTime(entry.occurred_at)}
       </span>
 
-      {suggestion && (
-        <p className="mt-2 text-sm text-accent">
-          Touri thinks this is <span className="display text-lg">{suggestion}</span>
+      {running && (
+        <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+          <Sparkles className="size-4 text-accent" strokeWidth={1.5} /> Looking at this one…
         </p>
       )}
 
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder={suggestion || "Name this memory"}
-        className="display mt-2 w-full border-b border-rule bg-transparent pb-2 text-2xl outline-none placeholder:text-muted-foreground/40"
-      />
-
-      <div className="mt-3 flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em]">
-        {(["photo", "landmark", "restaurant", "jot"] as Kind[]).map((k) => (
+      {entry.ai_status === "failed" && (
+        <div className="mt-3 flex items-center justify-between gap-3 border-l-2 border-rule pl-3">
+          <p className="text-sm text-muted-foreground">
+            Touri couldn't look at this one just now. The photo is safe.
+          </p>
           <button
-            key={k}
-            onClick={() => setKind(k)}
-            className={cn("border border-rule px-3 py-1.5", kind === k && "border-accent text-accent")}
+            onClick={retry}
+            disabled={busy}
+            className="whitespace-nowrap text-xs uppercase tracking-[0.14em] text-accent disabled:opacity-40"
           >
-            {k}
+            Try again
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
-      <div className="mt-2 flex flex-wrap gap-2 text-sm">
-        {cities.data?.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setCityId(c.id)}
-            className={cn("border border-rule px-3 py-1.5", cityId === c.id && "border-accent text-accent")}
-          >
-            {c.name}
-          </button>
-        ))}
-      </div>
+      {entry.ai_status === "done" && !suggestion && (
+        <p className="mt-3 text-sm text-muted-foreground">No landmark detected.</p>
+      )}
 
-      <div className="mt-5 flex items-center gap-4">
-        <button
-          onClick={confirm}
-          className="flex-1 bg-primary py-3 text-xs uppercase tracking-[0.18em] text-primary-foreground"
-        >
-          Keep
-        </button>
-        <button
-          onClick={ask}
-          disabled={thinking || !photo}
-          className="flex items-center gap-2 border border-rule px-4 py-3 text-xs uppercase tracking-[0.18em] disabled:opacity-40"
-        >
-          <Sparkles className="size-4 text-accent" strokeWidth={1.5} />
-          {thinking ? "Looking…" : "Identify"}
-        </button>
-        <button onClick={discard} className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-          Discard
-        </button>
-      </div>
+      {entry.ai_status === "done" && suggestion && !rejected && (
+        <div className="mt-4 border-l-2 border-accent pl-4">
+          <span className="eyebrow">Possible place</span>
+          <h3 className="display mt-1 text-2xl">{suggestion}</h3>
+          {entry.ai_place && <p className="text-sm text-muted-foreground">{entry.ai_place}</p>}
+          {!!percent && <p className="timecode mt-1">{percent}% match</p>}
+          {entry.ai_explanation && (
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {entry.ai_explanation}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.14em]">
+            <button
+              onClick={() => confirm(true)}
+              disabled={busy}
+              className="bg-primary px-5 py-2.5 text-primary-foreground disabled:opacity-40"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => {
+                setTitle(suggestion);
+                setKind("landmark");
+                setEditing(true);
+              }}
+              className="text-muted-foreground"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                setRejected(true);
+                setEditing(true);
+              }}
+              className="text-muted-foreground"
+            >
+              Not this
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(editing || !suggestion || rejected || entry.ai_status !== "done") && (
+        <>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Name this memory"
+            className="display mt-4 w-full border-b border-rule bg-transparent pb-2 text-2xl outline-none placeholder:text-muted-foreground/40"
+          />
+
+          <div className="mt-3 flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em]">
+            {(["photo", "landmark", "restaurant", "jot"] as Kind[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => setKind(k)}
+                className={cn(
+                  "border border-rule px-3 py-1.5",
+                  kind === k && "border-accent text-accent",
+                )}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2 text-sm">
+            {cities.data?.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCityId(c.id)}
+                className={cn(
+                  "border border-rule px-3 py-1.5",
+                  cityId === c.id && "border-accent text-accent",
+                )}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-5 flex items-center gap-4">
+            <button
+              onClick={() => confirm(false)}
+              disabled={busy}
+              className="flex-1 bg-primary py-3 text-xs uppercase tracking-[0.18em] text-primary-foreground disabled:opacity-40"
+            >
+              Keep
+            </button>
+            <button
+              onClick={discard}
+              className="text-xs uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              Discard
+            </button>
+          </div>
+        </>
+      )}
     </li>
   );
 }
+
