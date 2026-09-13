@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Camera, MapPin, PenLine, Plus, UtensilsCrossed, X } from "lucide-react";
 import { usePendingCount } from "@/lib/touri";
@@ -24,6 +24,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pending = usePendingCount();
   const queue = useUploadQueue();
+  const pathname = useLocation({ select: (l) => l.pathname });
+  const currentCity = pathname.match(/^\/city\/([^/]+)/)?.[1];
 
 
   return (
@@ -53,9 +55,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => {
                     setOpen(false);
                     if (o.kind === "photos")
-                      navigate({ to: "/add/photos", search: { city: undefined } });
-
-                    else navigate({ to: "/add/$kind", params: { kind: o.kind } });
+                      navigate({ to: "/add/photos", search: { city: currentCity } });
+                    else
+                      navigate({
+                        to: "/add/$kind",
+                        params: { kind: o.kind },
+                        search: { city: currentCity },
+                      });
                   }}
                 >
                   <o.icon className="size-5 text-accent" strokeWidth={1.5} />
