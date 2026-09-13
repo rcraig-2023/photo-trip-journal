@@ -28,7 +28,7 @@ export function PhotoGrid({
   if (n === 1) {
     return (
       <div className={cn("grid grid-cols-1 gap-[2px]", className)}>
-        <Photo path={shown[0].storage_path} alt={alt} className="aspect-[4/5] w-full" />
+        <Photo path={shown[0]!.storage_path} alt={alt} className="aspect-[4/5] w-full" />
       </div>
     );
   }
@@ -47,12 +47,12 @@ export function PhotoGrid({
     return (
       <div className={cn("grid grid-cols-2 gap-[2px]", className)}>
         <Photo
-          path={shown[0].storage_path}
+          path={shown[0]!.storage_path}
           alt={alt}
           className="col-span-2 aspect-[3/2] w-full"
         />
-        <Photo path={shown[1].storage_path} alt={alt} className="aspect-square w-full" />
-        <Photo path={shown[2].storage_path} alt={alt} className="aspect-square w-full" />
+        <Photo path={shown[1]!.storage_path} alt={alt} className="aspect-square w-full" />
+        <Photo path={shown[2]!.storage_path} alt={alt} className="aspect-square w-full" />
       </div>
     );
   }
