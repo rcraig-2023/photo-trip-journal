@@ -110,7 +110,7 @@ function Today() {
         <h2 className="eyebrow px-6">Lately</h2>
         <ul className="mt-3">
           {entries.data?.length ? (
-            entries.data.map((e, i) => (
+            entries.data.map((e) => (
               <li key={e.id} className="px-6">
                 <Link
                   to="/entry/$entryId"
