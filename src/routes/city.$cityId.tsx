@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
-import { Photo } from "@/components/Photo";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import { fmtRange, fmtTime, useCity, useEntries, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
@@ -134,30 +134,11 @@ function CityPage() {
                       </p>
                     )}
                     {!!e.entry_photos?.length && (
-                      <div
-                        className={cn(
-                          "mt-3 grid gap-1",
-                          e.entry_photos.length > 1 ? "grid-cols-2" : "grid-cols-1",
-                        )}
-                      >
-                        {e.entry_photos.slice(0, 4).map((p, j) => (
-                          <Photo
-                            key={p.id}
-                            path={p.storage_path}
-                            alt={e.title ?? "Memory"}
-                            className={cn(
-                              "w-full",
-                              e.entry_photos!.length === 1
-                                ? i % 2 === 0
-                                  ? "aspect-[4/5]"
-                                  : "aspect-[3/2]"
-                                : j === 0
-                                  ? "row-span-2 aspect-[3/4]"
-                                  : "aspect-square",
-                            )}
-                          />
-                        ))}
-                      </div>
+                      <PhotoGrid
+                        photos={e.entry_photos}
+                        alt={e.title ?? "Memory"}
+                        className="mt-3"
+                      />
                     )}
                   </div>
                 </Link>
