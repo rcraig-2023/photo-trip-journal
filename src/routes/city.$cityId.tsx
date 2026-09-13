@@ -102,7 +102,7 @@ function CityPage() {
             })}
           </h2>
           <ol className="mt-2">
-            {list.map((e, i) => (
+            {list.map((e) => (
               <li key={e.id} className="px-6">
                 <Link
                   to="/entry/$entryId"

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
-import { Photo } from "@/components/Photo";
+import { PhotoGrid } from "@/components/PhotoGrid";
 import {
   fmtDay,
   fmtRange,
@@ -129,14 +129,10 @@ function Today() {
                         </p>
                       )}
                       {!!e.entry_photos?.length && (
-                        <Photo
-                          path={e.entry_photos[0]?.storage_path}
+                        <PhotoGrid
+                          photos={e.entry_photos}
                           alt={e.title ?? "Memory"}
-                          className={
-                            i % 3 === 0
-                              ? "mt-3 aspect-[4/5] w-full"
-                              : "mt-3 aspect-[3/2] w-full"
-                          }
+                          className="mt-3"
                         />
                       )}
                     </div>
