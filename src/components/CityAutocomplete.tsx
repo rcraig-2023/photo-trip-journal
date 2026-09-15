@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
-export type PlaceHit = { name: string; country: string | null; label: string };
+export type PlaceHit = {
+  name: string;
+  country: string | null;
+  label: string;
+  lat: number | null;
+  lng: number | null;
+};
 
 type PhotonFeature = {
+  geometry?: { coordinates?: [number, number] };
   properties?: {
     name?: string;
     city?: string;
@@ -34,7 +41,14 @@ async function searchPlaces(q: string, signal: AbortSignal): Promise<PlaceHit[]>
     const label = [name !== p.name && p.name ? p.name : null, region, country]
       .filter(Boolean)
       .join(", ");
-    hits.push({ name, country, label: label || name });
+    const coords = f.geometry?.coordinates;
+    hits.push({
+      name,
+      country,
+      label: label || name,
+      lng: Array.isArray(coords) ? Number(coords[0]) : null,
+      lat: Array.isArray(coords) ? Number(coords[1]) : null,
+    });
   }
   return hits;
 }

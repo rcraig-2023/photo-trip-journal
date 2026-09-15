@@ -56,6 +56,8 @@ export type Database = {
           created_at: string
           end_date: string | null
           id: string
+          lat: number | null
+          lng: number | null
           name: string
           sort_order: number
           start_date: string | null
@@ -68,6 +70,8 @@ export type Database = {
           created_at?: string
           end_date?: string | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           name: string
           sort_order?: number
           start_date?: string | null
@@ -80,6 +84,8 @@ export type Database = {
           created_at?: string
           end_date?: string | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           name?: string
           sort_order?: number
           start_date?: string | null

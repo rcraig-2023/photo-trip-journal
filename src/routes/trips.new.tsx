@@ -28,13 +28,22 @@ export const Route = createFileRoute("/trips/new")({
   ),
 });
 
-type Row = { name: string; country: string; start: string; end: string };
+type Row = {
+  name: string;
+  country: string;
+  start: string;
+  end: string;
+  lat: number | null;
+  lng: number | null;
+};
+
+const emptyRow = (): Row => ({ name: "", country: "", start: "", end: "", lat: null, lng: null });
 
 function NewTrip() {
   const [title, setTitle] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [rows, setRows] = useState<Row[]>([{ name: "", country: "", start: "", end: "" }]);
+  const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -75,6 +84,8 @@ function NewTrip() {
         start_date: r.start || null,
         end_date: r.end || null,
         sort_order: i,
+        lat: r.lat,
+        lng: r.lng,
       }));
     if (cities.length) await supabase.from("cities").insert(cities);
 
@@ -120,12 +131,14 @@ function NewTrip() {
           <CityAutocomplete
             value={r.name}
             onChange={(v) =>
-              setRows(rows.map((x, j) => (i === j ? { ...x, name: v, country: "" } : x)))
+              setRows(rows.map((x, j) => (i === j ? { ...x, name: v, country: "", lat: null, lng: null } : x)))
             }
             onPick={(hit) =>
               setRows(
                 rows.map((x, j) =>
-                  i === j ? { ...x, name: hit.name, country: hit.country ?? "" } : x,
+                  i === j
+                    ? { ...x, name: hit.name, country: hit.country ?? "", lat: hit.lat, lng: hit.lng }
+                    : x,
                 ),
               )
             }
@@ -159,7 +172,7 @@ function NewTrip() {
       ))}
       <button
         type="button"
-        onClick={() => setRows([...rows, { name: "", country: "", start: "", end: "" }])}
+        onClick={() => setRows([...rows, emptyRow()])}
         className="mt-5 text-xs uppercase tracking-[0.18em] text-accent"
       >
         + Another city

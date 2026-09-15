@@ -1,8 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly, Link } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
+import type { MapPoint } from "@/components/JourneyMap";
 import { fmtRange, useActiveTrip, useCities, useEntries, useTrips } from "@/lib/touri";
+
+const JourneyMap = lazy(() => import("@/components/JourneyMap"));
 
 export const Route = createFileRoute("/trip")({
   head: () => ({
@@ -48,9 +52,22 @@ function TripPage() {
     entries.data?.find((e) => e.city_id === cityId && e.entry_photos?.length)?.entry_photos?.[0]
       ?.storage_path;
 
+  const points: MapPoint[] = (cities.data ?? [])
+    .filter((c) => c.lat != null && c.lng != null)
+    .map((c) => ({ id: c.id, name: c.name, lat: Number(c.lat), lng: Number(c.lng) }));
+
   return (
     <div>
-      <header className="px-6 pt-12">
+      {points.length > 0 && (
+        <div className="h-64 w-full overflow-hidden border-b border-rule">
+          <ClientOnly fallback={<div className="h-full w-full bg-muted/30" />}>
+            <Suspense fallback={<div className="h-full w-full bg-muted/30" />}>
+              <JourneyMap points={points} />
+            </Suspense>
+          </ClientOnly>
+        </div>
+      )}
+      <header className="px-6 pt-10">
         <span className="eyebrow">Current trip</span>
         <h1 className="display mt-5 text-[3rem]">{trip.title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
