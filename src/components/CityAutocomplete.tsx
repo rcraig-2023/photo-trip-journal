@@ -2,38 +2,39 @@ import { useEffect, useRef, useState } from "react";
 
 export type PlaceHit = { name: string; country: string | null; label: string };
 
-type Raw = {
-  name?: string;
-  display_name?: string;
-  address?: Record<string, string | undefined>;
+type PhotonFeature = {
+  properties?: {
+    name?: string;
+    city?: string;
+    town?: string;
+    village?: string;
+    county?: string;
+    state?: string;
+    country?: string;
+  };
 };
 
 async function searchPlaces(q: string, signal: AbortSignal): Promise<PlaceHit[]> {
   const url =
-    "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&featuretype=city&q=" +
-    encodeURIComponent(q);
+    "https://photon.komoot.io/api/?limit=6&q=" + encodeURIComponent(q);
   const res = await fetch(url, { signal, headers: { Accept: "application/json" } });
   if (!res.ok) return [];
-  const rows = (await res.json()) as Raw[];
+  const data = (await res.json()) as { features?: PhotonFeature[] };
   const seen = new Set<string>();
   const hits: PlaceHit[] = [];
-  for (const r of rows) {
-    const a = r.address ?? {};
-    const name =
-      r.name ||
-      a["city"] ||
-      a["town"] ||
-      a["village"] ||
-      a["municipality"] ||
-      a["county"] ||
-      r.display_name?.split(",")[0] ||
-      "";
-    const country = a["country"] ?? null;
+  for (const f of data.features ?? []) {
+    const p = f.properties ?? {};
+    const name = p.city || p.town || p.village || p.name || "";
     if (!name) continue;
+    const country = p.country ?? null;
     const key = `${name}|${country ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    hits.push({ name, country, label: r.display_name ?? name });
+    const region = p.state || p.county;
+    const label = [name !== p.name && p.name ? p.name : null, region, country]
+      .filter(Boolean)
+      .join(", ");
+    hits.push({ name, country, label: label || name });
   }
   return hits;
 }
