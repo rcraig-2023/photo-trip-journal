@@ -20,6 +20,8 @@ export type City = {
   start_date: string | null;
   end_date: string | null;
   sort_order: number;
+  lat: number | null;
+  lng: number | null;
 };
 
 export type Entry = {
