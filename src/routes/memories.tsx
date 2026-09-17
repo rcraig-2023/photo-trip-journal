@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
+import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
 import { ensureEnrichment, findOrCreateLandmark } from "@/lib/landmarks";
@@ -92,7 +93,7 @@ function MemoriesPage() {
         </ul>
       ) : (
         <>
-          <div className="flex gap-5 overflow-x-auto px-6 py-4 text-xs uppercase tracking-[0.14em]">
+          <div className="sticky top-0 z-20 flex gap-5 overflow-x-auto border-b border-rule bg-paper/90 px-6 py-4 text-xs uppercase tracking-[0.14em] backdrop-blur-md">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
@@ -106,8 +107,11 @@ function MemoriesPage() {
               </button>
             ))}
           </div>
+          {filter === "photo" ? (
+            <EditorialPhotoMosaic entries={confirmed} />
+          ) : (
           <ul>
-            {confirmed.map((e, i) => (
+            {confirmed.map((e) => (
               <li key={e.id} className="px-6">
                 <Link
                   to="/entry/$entryId"
@@ -131,7 +135,7 @@ function MemoriesPage() {
                     <Photo
                       path={e.entry_photos[0]?.storage_path}
                       alt={e.title ?? "Memory"}
-                      className={cn("mt-3 w-full", i % 4 === 0 ? "aspect-[4/5]" : "aspect-[3/2]")}
+                      className="mt-3 aspect-[3/2] w-full"
                     />
                   )}
                 </Link>
@@ -141,6 +145,7 @@ function MemoriesPage() {
               <li className="px-6 py-16 text-sm text-muted-foreground">Nothing here yet.</li>
             )}
           </ul>
+          )}
         </>
       )}
     </div>
