@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
+import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { fmtRange, fmtTime, useCity, useEntries, type Kind } from "@/lib/touri";
@@ -77,7 +78,7 @@ function CityPage() {
       </header>
 
 
-      <div className="mt-8 flex gap-5 overflow-x-auto border-y border-rule px-6 py-3 text-xs uppercase tracking-[0.14em]">
+      <div className="sticky top-0 z-20 mt-8 flex gap-5 overflow-x-auto border-b border-rule bg-paper/90 px-6 py-3 text-xs uppercase tracking-[0.14em] backdrop-blur-md">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -92,7 +93,10 @@ function CityPage() {
         ))}
       </div>
 
-      {[...days.entries()].map(([day, list]) => (
+      {filter === "photo" ? (
+        <EditorialPhotoMosaic entries={items} />
+      ) : (
+        [...days.entries()].map(([day, list]) => (
         <section key={day} className="mt-10">
           <h2 className="eyebrow px-6">
             {new Date(day + "T00:00:00").toLocaleDateString("en-US", {
@@ -146,7 +150,8 @@ function CityPage() {
             ))}
           </ol>
         </section>
-      ))}
+        ))
+      )}
 
       {!items.length && (
         <p className="px-6 py-16 text-sm text-muted-foreground">
