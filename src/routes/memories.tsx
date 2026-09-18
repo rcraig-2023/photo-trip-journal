@@ -18,6 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Sheet,
@@ -357,18 +358,16 @@ function InboxTriage({ entries }: { entries: Entry[] }) {
               Confirm {selected.size} {selected.size === 1 ? "Memory" : "Memories"}
             </Button>
             <AlertDialog>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={busy}
-                aria-label={`Discard ${selected.size} selected ${selected.size === 1 ? "memory" : "memories"}`}
-                asChild
-              >
-                <AlertDialogAction className="h-11 w-11 border-destructive bg-transparent text-destructive shadow-none hover:bg-destructive hover:text-destructive-foreground">
-                  <Trash2 />
-                </AlertDialogAction>
-              </Button>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  className="h-11 rounded-sm border-destructive px-3 text-xs uppercase tracking-[0.08em] text-destructive shadow-none hover:bg-destructive hover:text-destructive-foreground"
+                >
+                  <Trash2 /> Discard
+                </Button>
+              </AlertDialogTrigger>
               <AlertDialogContent className="max-w-[calc(100%-2rem)] rounded-sm bg-paper">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="display text-2xl">Discard selected memories?</AlertDialogTitle>
