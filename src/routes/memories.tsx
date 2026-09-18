@@ -1,13 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { Check, Info, Sparkles, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ensureEnrichment, findOrCreateLandmark } from "@/lib/landmarks";
 import { retryRecognition } from "@/lib/uploadQueue";
 import { fmtTime, useActiveTrip, useCities, useEntries, type Entry, type Kind } from "@/lib/touri";
@@ -26,6 +45,8 @@ export const Route = createFileRoute("/memories")({
         property: "og:description",
         content: "Confirm freshly uploaded photos and browse every memory across your trips.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: () => (
@@ -82,15 +103,7 @@ function MemoriesPage() {
       </div>
 
       {tab === "new" ? (
-        <ul>
-          {pending.data?.length ? (
-            pending.data.map((e) => <InboxItem key={e.id} entry={e} />)
-          ) : (
-            <li className="px-6 py-16 text-sm text-muted-foreground">
-              Nothing waiting. Tap + → Photos to bring in a batch from your phone.
-            </li>
-          )}
-        </ul>
+        <InboxTriage entries={pending.data ?? []} />
       ) : (
         <>
           <div className="sticky top-0 z-20 flex gap-5 overflow-x-auto border-b border-rule bg-paper/90 px-6 py-4 text-xs uppercase tracking-[0.14em] backdrop-blur-md">
@@ -152,7 +165,235 @@ function MemoriesPage() {
   );
 }
 
-function InboxItem({ entry }: { entry: Entry }) {
+function InboxTriage({ entries }: { entries: Entry[] }) {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [inspection, setInspection] = useState<Entry | null>(null);
+  const [busy, setBusy] = useState(false);
+  const selectedEntries = entries.filter((entry) => selected.has(entry.id));
+
+  useEffect(() => {
+    const visibleIds = new Set(entries.map((entry) => entry.id));
+    setSelected((current) => {
+      const next = new Set([...current].filter((id) => visibleIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [entries]);
+
+  function toggle(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function confirmSelected() {
+    if (!selectedEntries.length || busy) return;
+    setBusy(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) throw new Error("Please sign in again to confirm these memories.");
+
+      const recognized = selectedEntries.filter((entry) => !!entry.ai_suggestion);
+      const ordinaryIds = selectedEntries
+        .filter((entry) => !entry.ai_suggestion)
+        .map((entry) => entry.id);
+
+      if (ordinaryIds.length) {
+        const { error } = await supabase
+          .from("entries")
+          .update({ status: "confirmed" })
+          .in("id", ordinaryIds);
+        if (error) throw error;
+      }
+
+      for (const entry of recognized) {
+        const suggestion = entry.ai_suggestion;
+        if (!suggestion) continue;
+        const landmark = await findOrCreateLandmark({
+          userId: uid,
+          name: suggestion,
+          placeName: entry.ai_place,
+          tripId: entry.trip_id,
+          cityId: entry.city_id,
+        });
+        const { error } = await supabase
+          .from("entries")
+          .update({
+            title: suggestion,
+            kind: "landmark",
+            status: "confirmed",
+            landmark_id: landmark.id,
+            place_name: entry.ai_place ?? entry.place_name,
+          })
+          .eq("id", entry.id);
+        if (error) throw error;
+        void ensureEnrichment(landmark).then(() => qc.invalidateQueries());
+      }
+
+      setSelected(new Set());
+      toast.success(
+        `${selectedEntries.length} ${selectedEntries.length === 1 ? "memory" : "memories"} confirmed.`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not confirm those memories.");
+    } finally {
+      await qc.invalidateQueries();
+      setBusy(false);
+    }
+  }
+
+  async function discardSelected() {
+    if (!selectedEntries.length || busy) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("entries")
+        .delete()
+        .in(
+          "id",
+          selectedEntries.map((entry) => entry.id),
+        );
+      if (error) throw error;
+      setSelected(new Set());
+      toast.success(
+        `${selectedEntries.length} ${selectedEntries.length === 1 ? "memory" : "memories"} discarded.`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not discard those memories.");
+    } finally {
+      await qc.invalidateQueries();
+      setBusy(false);
+    }
+  }
+
+  if (!entries.length) {
+    return (
+      <p className="px-6 py-16 text-sm text-muted-foreground">
+        Nothing waiting. Tap + → Photos to bring in a batch from your phone.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div className={cn("grid grid-cols-3 gap-[2px]", selected.size > 0 && "pb-24")}>
+        {entries.map((entry) => {
+          const photo = entry.entry_photos?.[0];
+          const isSelected = selected.has(entry.id);
+          return (
+            <div key={entry.id} className="relative aspect-square overflow-hidden bg-muted">
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={`${isSelected ? "Deselect" : "Select"} memory`}
+                aria-pressed={isSelected}
+                onClick={() => toggle(entry.id)}
+                className={cn(
+                  "h-full w-full rounded-none p-0 transition-transform duration-200 hover:bg-transparent",
+                  isSelected && "scale-[0.94] ring-2 ring-inset ring-accent",
+                )}
+              >
+                {photo ? (
+                  <Photo
+                    path={photo.storage_path}
+                    alt={entry.ai_suggestion ?? entry.title ?? "New memory"}
+                    className="h-full w-full"
+                  />
+                ) : (
+                  <span className="eyebrow">No photo</span>
+                )}
+              </Button>
+
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute left-2 top-2 flex size-6 items-center justify-center rounded-full border border-paper/80 bg-paper/75 text-foreground shadow-sm backdrop-blur-sm transition",
+                  isSelected && "border-accent bg-accent text-accent-foreground",
+                )}
+              >
+                {isSelected && <Check className="size-4" strokeWidth={2.5} />}
+              </span>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Inspect memory details"
+                onClick={() => setInspection(entry)}
+                className="absolute bottom-1.5 right-1.5 size-7 rounded-full bg-paper/80 text-foreground shadow-sm backdrop-blur-sm hover:bg-paper"
+              >
+                <Info className="size-4" />
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+
+      <Sheet open={!!inspection} onOpenChange={(open) => !open && setInspection(null)}>
+        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto bg-paper px-0 pb-10 pt-6">
+          <SheetHeader className="px-6 text-left">
+            <span className="eyebrow">Closer look</span>
+            <SheetTitle className="display text-3xl">Review this memory</SheetTitle>
+            <SheetDescription>Check Touri’s suggestion or edit the details before keeping it.</SheetDescription>
+          </SheetHeader>
+          {inspection && (
+            <InboxItem entry={inspection} onComplete={() => setInspection(null)} />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-[4.85rem] z-40 mx-auto w-full max-w-2xl border-t border-rule bg-paper/95 px-4 py-3 shadow-lg backdrop-blur-md">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              onClick={confirmSelected}
+              disabled={busy}
+              className="h-11 flex-1 rounded-sm text-xs uppercase tracking-[0.08em]"
+            >
+              Confirm {selected.size} {selected.size === 1 ? "Memory" : "Memories"}
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  className="h-11 rounded-sm border-destructive px-3 text-xs uppercase tracking-[0.08em] text-destructive shadow-none hover:bg-destructive hover:text-destructive-foreground"
+                >
+                  <Trash2 /> Discard
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="max-w-[calc(100%-2rem)] rounded-sm bg-paper">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="display text-2xl">Discard selected memories?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes {selected.size} selected {selected.size === 1 ? "memory" : "memories"}.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep them</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={discardSelected}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Discard
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => void }) {
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
   const qc = useQueryClient();
@@ -210,6 +451,7 @@ function InboxItem({ entry }: { entry: Entry }) {
         })
         .eq("id", entry.id);
       await qc.invalidateQueries();
+      onComplete?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save that.");
     } finally {
@@ -219,11 +461,12 @@ function InboxItem({ entry }: { entry: Entry }) {
 
   async function discard() {
     await supabase.from("entries").delete().eq("id", entry.id);
-    qc.invalidateQueries();
+    await qc.invalidateQueries();
+    onComplete?.();
   }
 
   return (
-    <li className="border-t border-rule px-6 py-6">
+    <div className="mt-6 border-t border-rule px-6 py-6">
       {photo && <Photo path={photo.storage_path} alt="New memory" className="aspect-[4/5] w-full" />}
       <span className="timecode mt-3 block">
         {new Date(entry.occurred_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
@@ -353,7 +596,7 @@ function InboxItem({ entry }: { entry: Entry }) {
           </div>
         </>
       )}
-    </li>
+    </div>
   );
 }
 
