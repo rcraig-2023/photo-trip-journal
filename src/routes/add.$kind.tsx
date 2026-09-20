@@ -92,6 +92,13 @@ function AddEntry() {
       body: body.trim() || null,
       status: "confirmed",
       occurred_at: (isNaN(occurred.getTime()) ? new Date() : occurred).toISOString(),
+      ...(k === "restaurant"
+        ? {
+            cuisine_type: cuisine.trim() || null,
+            price_tier: priceTier,
+            personal_rating: rated ? rating : null,
+          }
+        : {}),
     });
     setBusy(false);
     if (error) {
