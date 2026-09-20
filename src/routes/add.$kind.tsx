@@ -58,6 +58,10 @@ function AddEntry() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [when, setWhen] = useState(nowLocal);
+  const [cuisine, setCuisine] = useState("");
+  const [priceTier, setPriceTier] = useState<number | null>(null);
+  const [rating, setRating] = useState(7);
+  const [rated, setRated] = useState(false);
   const [busy, setBusy] = useState(false);
   const touchedWhen = useRef(false);
   const navigate = useNavigate();
