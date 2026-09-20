@@ -103,6 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Add
             </span>
           </button>
+          <NavItem to="/dining" label="Dining" icon={UtensilsCrossed} />
           <NavItem to="/memories" label="Memories" badge={pending.data ?? 0} />
         </div>
       </nav>
@@ -110,7 +111,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function NavItem({ to, label, badge }: { to: string; label: string; badge?: number }) {
+function NavItem({
+  to,
+  label,
+  badge,
+  icon: Icon,
+}: {
+  to: string;
+  label: string;
+  badge?: number;
+  icon?: typeof UtensilsCrossed;
+}) {
   return (
     <Link
       to={to}
