@@ -130,7 +130,11 @@ function NavItem({
       activeOptions={{ exact: to === "/" }}
     >
       <span className="relative flex size-9 items-center justify-center">
-        <span className="size-1.5 rounded-full bg-current opacity-40" />
+        {Icon ? (
+          <Icon className="size-4 opacity-70" strokeWidth={1.5} />
+        ) : (
+          <span className="size-1.5 rounded-full bg-current opacity-40" />
+        )}
         {!!badge && (
           <span className="absolute -right-0.5 top-1 min-w-4 rounded-full bg-accent px-1 text-[0.6rem] leading-4 text-accent-foreground">
             {badge}
