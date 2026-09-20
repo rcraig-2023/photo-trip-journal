@@ -115,11 +115,14 @@ export type Database = {
           body: string | null
           city_id: string | null
           created_at: string
+          cuisine_type: string | null
           id: string
           kind: string
           landmark_id: string | null
           occurred_at: string
+          personal_rating: number | null
           place_name: string | null
+          price_tier: number | null
           status: string
           title: string | null
           trip_id: string | null
@@ -137,11 +140,14 @@ export type Database = {
           body?: string | null
           city_id?: string | null
           created_at?: string
+          cuisine_type?: string | null
           id?: string
           kind?: string
           landmark_id?: string | null
           occurred_at?: string
+          personal_rating?: number | null
           place_name?: string | null
+          price_tier?: number | null
           status?: string
           title?: string | null
           trip_id?: string | null
@@ -159,11 +165,14 @@ export type Database = {
           body?: string | null
           city_id?: string | null
           created_at?: string
+          cuisine_type?: string | null
           id?: string
           kind?: string
           landmark_id?: string | null
           occurred_at?: string
+          personal_rating?: number | null
           place_name?: string | null
+          price_tier?: number | null
           status?: string
           title?: string | null
           trip_id?: string | null

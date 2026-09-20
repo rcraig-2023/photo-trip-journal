@@ -58,6 +58,10 @@ function AddEntry() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [when, setWhen] = useState(nowLocal);
+  const [cuisine, setCuisine] = useState("");
+  const [priceTier, setPriceTier] = useState<number | null>(null);
+  const [rating, setRating] = useState(7);
+  const [rated, setRated] = useState(false);
   const [busy, setBusy] = useState(false);
   const touchedWhen = useRef(false);
   const navigate = useNavigate();
@@ -88,6 +92,13 @@ function AddEntry() {
       body: body.trim() || null,
       status: "confirmed",
       occurred_at: (isNaN(occurred.getTime()) ? new Date() : occurred).toISOString(),
+      ...(k === "restaurant"
+        ? {
+            cuisine_type: cuisine.trim() || null,
+            price_tier: priceTier,
+            personal_rating: rated ? rating : null,
+          }
+        : {}),
     });
     setBusy(false);
     if (error) {
@@ -133,6 +144,55 @@ function AddEntry() {
         }}
         className="mt-2 w-full border-b border-rule bg-transparent pb-2 outline-none"
       />
+
+      {k === "restaurant" && (
+        <>
+          <h2 className="eyebrow mt-8">Cuisine</h2>
+          <input
+            value={cuisine}
+            onChange={(e) => setCuisine(e.target.value)}
+            placeholder="Sicilian, ramen, small plates…"
+            className="mt-2 w-full border-b border-rule bg-transparent pb-2 outline-none placeholder:text-muted-foreground/40"
+          />
+
+          <h2 className="eyebrow mt-8">Price</h2>
+          <div className="mt-3 flex gap-2">
+            {[1, 2, 3, 4].map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setPriceTier(priceTier === t ? null : t)}
+                className={cn(
+                  "border border-rule px-4 py-2 text-sm tracking-[0.08em]",
+                  priceTier === t && "border-accent text-accent",
+                )}
+              >
+                {"$".repeat(t)}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-8 flex items-baseline justify-between">
+            <h2 className="eyebrow">Rating</h2>
+            <span className="display text-2xl">
+              {rated ? rating.toFixed(1) : "—"}
+              <span className="text-sm text-muted-foreground">/10</span>
+            </span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={0.5}
+            value={rating}
+            onChange={(e) => {
+              setRated(true);
+              setRating(Number(e.target.value));
+            }}
+            className="mt-3 w-full accent-[var(--color-accent,currentColor)]"
+          />
+        </>
+      )}
 
       <h2 className="eyebrow mt-8">City</h2>
       <div className="mt-3 flex flex-wrap gap-2">

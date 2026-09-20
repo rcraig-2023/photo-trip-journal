@@ -41,8 +41,35 @@ export type Entry = {
   ai_explanation: string | null;
   ai_confidence: number | null;
   ai_error: string | null;
+  cuisine_type: string | null;
+  price_tier: number | null;
+  personal_rating: number | null;
   entry_photos?: { id: string; storage_path: string; sha256: string | null }[];
+  cities?: { id: string; name: string; country: string | null } | null;
 };
+
+export const PRICE_LABEL: Record<number, string> = {
+  1: "$",
+  2: "$$",
+  3: "$$$",
+  4: "$$$$",
+};
+
+export function useRestaurants() {
+  return useQuery({
+    queryKey: ["restaurants"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("entries")
+        .select("*, entry_photos(id, storage_path, sha256), cities(id, name, country)")
+        .eq("kind", "restaurant")
+        .neq("status", "pending")
+        .order("occurred_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as Entry[];
+    },
+  });
+}
 
 
 export const KIND_LABEL: Record<Kind, string> = {

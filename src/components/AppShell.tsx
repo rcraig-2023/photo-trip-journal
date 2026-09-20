@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-2xl border-t border-rule bg-paper/95 backdrop-blur safe-bottom">
 
-        <div className="grid grid-cols-4 items-center px-2 pt-2">
+        <div className="grid grid-cols-5 items-center px-2 pt-2">
           <NavItem to="/" label="Today" />
           <NavItem to="/trip" label="Trip" />
           <button
@@ -103,6 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Add
             </span>
           </button>
+          <NavItem to="/dining" label="Dining" icon={UtensilsCrossed} />
           <NavItem to="/memories" label="Memories" badge={pending.data ?? 0} />
         </div>
       </nav>
@@ -110,7 +111,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function NavItem({ to, label, badge }: { to: string; label: string; badge?: number }) {
+function NavItem({
+  to,
+  label,
+  badge,
+  icon: Icon,
+}: {
+  to: string;
+  label: string;
+  badge?: number;
+  icon?: typeof UtensilsCrossed;
+}) {
   return (
     <Link
       to={to}
@@ -119,7 +130,11 @@ function NavItem({ to, label, badge }: { to: string; label: string; badge?: numb
       activeOptions={{ exact: to === "/" }}
     >
       <span className="relative flex size-9 items-center justify-center">
-        <span className="size-1.5 rounded-full bg-current opacity-40" />
+        {Icon ? (
+          <Icon className="size-4 opacity-70" strokeWidth={1.5} />
+        ) : (
+          <span className="size-1.5 rounded-full bg-current opacity-40" />
+        )}
         {!!badge && (
           <span className="absolute -right-0.5 top-1 min-w-4 rounded-full bg-accent px-1 text-[0.6rem] leading-4 text-accent-foreground">
             {badge}
