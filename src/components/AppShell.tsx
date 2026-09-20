@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-2xl border-t border-rule bg-paper/95 backdrop-blur safe-bottom">
 
-        <div className="grid grid-cols-4 items-center px-2 pt-2">
+        <div className="grid grid-cols-5 items-center px-2 pt-2">
           <NavItem to="/" label="Today" />
           <NavItem to="/trip" label="Trip" />
           <button
