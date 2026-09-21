@@ -28,6 +28,8 @@ export const Route = createFileRoute("/")({
         content:
           "Touri turns the photos already on your phone into an editorial travel journal, city by city.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: () => (

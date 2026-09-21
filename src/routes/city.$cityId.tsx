@@ -21,6 +21,8 @@ export const Route = createFileRoute("/city/$cityId")({
         property: "og:description",
         content: "A day-by-day timeline of photos, jots, landmarks and meals in this city.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: () => (
