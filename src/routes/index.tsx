@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { PhotoGrid } from "@/components/PhotoGrid";
+import { RankedPlaceCard } from "@/components/RankedPlaceCard";
 import {
   fmtDay,
   fmtRange,
@@ -112,32 +113,38 @@ function Today() {
           {entries.data?.length ? (
             entries.data.map((e) => (
               <li key={e.id} className="px-6">
-                <Link
-                  to="/entry/$entryId"
-                  params={{ entryId: e.id }}
-                  className="block border-t border-rule py-5"
-                >
-                  <div className="flex gap-4">
-                    <span className="timecode w-12 shrink-0 pt-1">{fmtTime(e.occurred_at)}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="display text-2xl">
-                        {e.title ?? (e.kind === "jot" ? "Jot" : "Untitled")}
-                      </p>
-                      {e.body && (
-                        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                          {e.body}
-                        </p>
-                      )}
-                      {!!e.entry_photos?.length && (
-                        <PhotoGrid
-                          photos={e.entry_photos}
-                          alt={e.title ?? "Memory"}
-                          className="mt-3"
-                        />
-                      )}
-                    </div>
+                {e.kind === "restaurant" || e.kind === "landmark" ? (
+                  <div className="py-3">
+                    <RankedPlaceCard entry={e} />
                   </div>
-                </Link>
+                ) : (
+                  <Link
+                    to="/entry/$entryId"
+                    params={{ entryId: e.id }}
+                    className="block border-t border-rule py-5"
+                  >
+                    <div className="flex gap-4">
+                      <span className="timecode w-12 shrink-0 pt-1">{fmtTime(e.occurred_at)}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="display text-2xl">
+                          {e.title ?? (e.kind === "jot" ? "Jot" : "Untitled")}
+                        </p>
+                        {e.body && (
+                          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                            {e.body}
+                          </p>
+                        )}
+                        {!!e.entry_photos?.length && (
+                          <PhotoGrid
+                            photos={e.entry_photos}
+                            alt={e.title ?? "Memory"}
+                            className="mt-3"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                )}
               </li>
             ))
           ) : (

@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { PhotoGrid } from "@/components/PhotoGrid";
+import { RankedPlaceCard } from "@/components/RankedPlaceCard";
 import { fmtRange, fmtTime, useCity, useEntries, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
@@ -108,44 +109,50 @@ function CityPage() {
           <ol className="mt-2">
             {list.map((e) => (
               <li key={e.id} className="px-6">
-                <Link
-                  to="/entry/$entryId"
-                  params={{ entryId: e.id }}
-                  className="flex gap-4 border-t border-rule py-5"
-                >
-                  <span className="timecode w-12 shrink-0 pt-1">{fmtTime(e.occurred_at)}</span>
-                  <div className="min-w-0 flex-1">
-                    {e.kind !== "jot" && (
-                      <h3 className="display text-[1.75rem] leading-tight">
-                        {e.title ?? "Untitled"}
-                      </h3>
-                    )}
-                    {e.place_name && (
-                      <p className="mt-0.5 text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                        {e.place_name}
-                      </p>
-                    )}
-                    {e.body && (
-                      <p
-                        className={cn(
-                          "text-sm leading-relaxed",
-                          e.kind === "jot"
-                            ? "font-[var(--font-display)] text-lg italic leading-snug"
-                            : "mt-2 text-muted-foreground",
-                        )}
-                      >
-                        {e.kind === "jot" ? `“${e.body}”` : e.body}
-                      </p>
-                    )}
-                    {!!e.entry_photos?.length && (
-                      <PhotoGrid
-                        photos={e.entry_photos}
-                        alt={e.title ?? "Memory"}
-                        className="mt-3"
-                      />
-                    )}
+                {e.kind === "restaurant" || e.kind === "landmark" ? (
+                  <div className="py-3">
+                    <RankedPlaceCard entry={e} />
                   </div>
-                </Link>
+                ) : (
+                  <Link
+                    to="/entry/$entryId"
+                    params={{ entryId: e.id }}
+                    className="flex gap-4 border-t border-rule py-5"
+                  >
+                    <span className="timecode w-12 shrink-0 pt-1">{fmtTime(e.occurred_at)}</span>
+                    <div className="min-w-0 flex-1">
+                      {e.kind !== "jot" && (
+                        <h3 className="display text-[1.75rem] leading-tight">
+                          {e.title ?? "Untitled"}
+                        </h3>
+                      )}
+                      {e.place_name && (
+                        <p className="mt-0.5 text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                          {e.place_name}
+                        </p>
+                      )}
+                      {e.body && (
+                        <p
+                          className={cn(
+                            "text-sm leading-relaxed",
+                            e.kind === "jot"
+                              ? "font-[var(--font-display)] text-lg italic leading-snug"
+                              : "mt-2 text-muted-foreground",
+                          )}
+                        >
+                          {e.kind === "jot" ? `“${e.body}”` : e.body}
+                        </p>
+                      )}
+                      {!!e.entry_photos?.length && (
+                        <PhotoGrid
+                          photos={e.entry_photos}
+                          alt={e.title ?? "Memory"}
+                          className="mt-3"
+                        />
+                      )}
+                    </div>
+                  </Link>
+                )}
               </li>
             ))}
           </ol>
