@@ -126,3 +126,64 @@ export const enrichLandmark = createServerFn({ method: "POST" })
       caption: parsed.caption ?? "",
     };
   });
+
+const ItineraryInput = z.object({
+  text: z.string().min(3).max(20_000),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  cities: z.array(z.string().max(120)).max(50),
+});
+
+export type ItineraryItem = {
+  title: string;
+  kind: "landmark" | "restaurant" | "jot";
+  place: string;
+  city: string;
+  note: string;
+  occurred_at: string | null;
+};
+
+/** Turns messy pasted itinerary text into planned entries anchored to the trip dates. */
+export const parseItinerary = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => ItineraryInput.parse(d))
+  .handler(async ({ data }) => {
+    const raw = await askGemini({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `You turn unstructured travel itineraries into structured plans. The text may be out of order, abbreviated or missing dates.
+Trip start date: ${data.startDate ?? "unknown"}. Trip end date: ${data.endDate ?? "unknown"}.
+Cities on this trip: ${data.cities.join(", ") || "unknown"}.
+Reply with strict JSON only: {"items": [{"title": string, "kind": "landmark"|"restaurant"|"jot", "place": string, "city": string, "note": string, "occurred_at": string|null}]}.
+Rules:
+- One item per distinct place or activity. "restaurant" for food/drink places, "landmark" for sights/museums/places, "jot" for anything else (transfers, reminders).
+- Anchor relative terms ("Day 1", "Friday", "the next morning", "last night") to the trip dates. Day 1 = trip start date. Weekdays refer to the first matching day within the trip range.
+- occurred_at is local time as "YYYY-MM-DDTHH:MM". If a day is implied but no time, use a sensible time (breakfast 09:00, lunch 13:00, dinner 20:00, sights 11:00).
+- If no date is implied at all, occurred_at MUST be null. Never invent dates.
+- "city" must be one of the listed cities when it clearly matches, otherwise "".
+- "note" is a short plain sentence from the source text, or "".`,
+        },
+        { role: "user", content: data.text },
+      ],
+    });
+
+    const parsed = parseJson<{ items?: Partial<ItineraryItem>[] }>(raw);
+    if (!parsed?.items) throw new Error("Could not read that itinerary. Try pasting it again.");
+
+    return parsed.items
+      .filter((i) => i.title && typeof i.title === "string")
+      .slice(0, 80)
+      .map<ItineraryItem>((i) => ({
+        title: String(i.title).slice(0, 200),
+        kind: i.kind === "restaurant" || i.kind === "landmark" ? i.kind : "jot",
+        place: String(i.place ?? "").slice(0, 200),
+        city: String(i.city ?? ""),
+        note: String(i.note ?? "").slice(0, 500),
+        occurred_at:
+          typeof i.occurred_at === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(i.occurred_at)
+            ? i.occurred_at.slice(0, 16)
+            : null,
+      }));
+  });
