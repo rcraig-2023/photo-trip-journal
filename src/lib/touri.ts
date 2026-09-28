@@ -44,6 +44,7 @@ export type Entry = {
   cuisine_type: string | null;
   price_tier: number | null;
   personal_rating: number | null;
+  date_unknown?: boolean;
   entry_photos?: { id: string; storage_path: string; sha256: string | null }[];
   cities?: { id: string; name: string; country: string | null } | null;
 };
