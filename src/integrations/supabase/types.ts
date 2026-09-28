@@ -116,6 +116,7 @@ export type Database = {
           city_id: string | null
           created_at: string
           cuisine_type: string | null
+          date_unknown: boolean
           id: string
           kind: string
           landmark_id: string | null
@@ -141,6 +142,7 @@ export type Database = {
           city_id?: string | null
           created_at?: string
           cuisine_type?: string | null
+          date_unknown?: boolean
           id?: string
           kind?: string
           landmark_id?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           city_id?: string | null
           created_at?: string
           cuisine_type?: string | null
+          date_unknown?: boolean
           id?: string
           kind?: string
           landmark_id?: string | null
