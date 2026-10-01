@@ -52,7 +52,10 @@ function CityPage() {
   const items = (entries.data ?? [])
     .filter((e) => e.status !== "pending" && !(e.status === "planned" && e.date_unknown))
     .filter((e) => filter !== "photo" || e.status !== "planned")
-    .filter((e) => filter === "all" || e.kind === filter)
+    .filter((e) =>
+      filter === "all" ||
+      (filter === "photo" ? !!e.entry_photos?.length : e.kind === filter),
+    )
     .slice()
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
 

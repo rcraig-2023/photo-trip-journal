@@ -58,6 +58,14 @@ function EntryPage() {
     }
   }
 
+  async function revertToPlanned() {
+    // Status only — occurred_at keeps its scheduled date and time.
+    const { error } = await supabase.from("entries").update({ status: "planned" }).eq("id", entryId);
+    if (error) return void toast.error(error.message);
+    toast.success("Back to planned.");
+    qc.invalidateQueries();
+  }
+
   async function remove() {
     await supabase.from("entries").delete().eq("id", entryId);
     qc.invalidateQueries();
@@ -134,6 +142,14 @@ function EntryPage() {
           >
             Save
           </button>
+          {e.status === "confirmed" && (
+            <button
+              onClick={revertToPlanned}
+              className="text-xs uppercase tracking-[0.18em] text-muted-foreground"
+            >
+              Revert to planned
+            </button>
+          )}
           <button onClick={remove} className="text-xs uppercase tracking-[0.18em] text-destructive">
             Delete
           </button>

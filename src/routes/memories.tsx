@@ -75,8 +75,18 @@ function MemoriesPage() {
   const [filter, setFilter] = useState<Kind | "all">("all");
 
   const confirmed = (all.data ?? []).filter(
-    (e) => e.status !== "pending" && e.status !== "planned" && (filter === "all" || e.kind === filter),
+    (e) =>
+      e.status !== "pending" &&
+      e.status !== "planned" &&
+      (filter === "all" ||
+        (filter === "photo" ? !!e.entry_photos?.length : e.kind === filter)),
   );
+
+  // Open on "All memories" whenever the inbox is empty.
+  const pendingCount = pending.data?.length;
+  useEffect(() => {
+    if (pendingCount === 0) setTab("all");
+  }, [pendingCount]);
 
   return (
     <div>
