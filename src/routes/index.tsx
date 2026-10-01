@@ -112,8 +112,8 @@ function Today() {
       <section className="mt-10">
         <h2 className="eyebrow px-6">Lately</h2>
         <ul className="mt-3">
-          {entries.data?.length ? (
-            entries.data.map((e) => (
+          {entries.data?.filter((e) => e.status !== "planned").length ? (
+            entries.data.filter((e) => e.status !== "planned").map((e) => (
               <li key={e.id} className="px-6">
                 {e.kind === "restaurant" || e.kind === "landmark" ? (
                   <div className="py-3">
