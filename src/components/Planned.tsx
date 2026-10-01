@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { parseItinerary } from "@/lib/ai.functions";
 import { confirmPlannedWithPhoto } from "@/lib/planned";
-import { KIND_LABEL, fmtTime, type City, type Entry, type Trip } from "@/lib/touri";
+import { KIND_LABEL, PRICE_LABEL, fmtTime, type City, type Entry, type Trip } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 function usePhotoAttach(entryId: string) {
@@ -49,19 +49,150 @@ function usePhotoAttach(entryId: string) {
   return { el, busy, open: () => input.current?.click() };
 }
 
-/** Dashed, muted timeline entry for a planned item. Tap to add a photo. */
-export function GhostEntry({ entry }: { entry: Entry }) {
-  const { el, busy, open } = usePhotoAttach(entry.id);
+function useMarkDone(entry: Entry) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+
+  async function markDone() {
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("entries")
+        .update({
+          status: "confirmed",
+          date_unknown: false,
+          ...(entry.date_unknown ? { occurred_at: new Date().toISOString() } : {}),
+        })
+        .eq("id", entry.id);
+      if (error) throw error;
+      if (entry.kind === "restaurant") setReviewing(true);
+      else {
+        toast.success("Marked as done.");
+        await qc.invalidateQueries();
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not mark this as done.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const review = (
+    <MealReview
+      entry={entry}
+      open={reviewing}
+      onClose={async () => {
+        setReviewing(false);
+        await qc.invalidateQueries();
+      }}
+    />
+  );
+  return { markDone, busy, review };
+}
+
+function MealReview({ entry, open, onClose }: { entry: Entry; open: boolean; onClose: () => void }) {
+  const [priceTier, setPriceTier] = useState<number | null>(entry.price_tier);
+  const [rating, setRating] = useState<number>(Number(entry.personal_rating ?? 7));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    const { error } = await supabase
+      .from("entries")
+      .update({ price_tier: priceTier, personal_rating: rating })
+      .eq("id", entry.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Meal reviewed.");
+    onClose();
+  }
+
   return (
-    <button
-      type="button"
-      onClick={open}
-      disabled={busy}
-      className="my-3 flex w-full gap-4 border border-dashed border-rule px-4 py-4 text-left opacity-60 transition-opacity hover:opacity-90"
-    >
-      {el}
-      <span className="timecode w-12 shrink-0 pt-1">{fmtTime(entry.occurred_at)}</span>
-      <span className="min-w-0 flex-1">
+    <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="bg-paper">
+        <DialogHeader>
+          <span className="eyebrow">Restaurant · Done</span>
+          <DialogTitle className="display text-3xl font-normal">{entry.title}</DialogTitle>
+          <DialogDescription>How was it? You can add a photo later.</DialogDescription>
+        </DialogHeader>
+        <div>
+          <span className="eyebrow">Price</span>
+          <div className="mt-2 flex gap-2">
+            {[1, 2, 3, 4].map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setPriceTier(priceTier === t ? null : t)}
+                className={cn(
+                  "flex-1 border border-rule py-2 text-sm tabular-nums text-muted-foreground",
+                  priceTier === t && "border-accent text-accent",
+                )}
+              >
+                {PRICE_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="flex items-baseline justify-between">
+            <span className="eyebrow">Rating</span>
+            <span className="display text-3xl tabular-nums text-accent">{rating.toFixed(1)}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={0.5}
+            value={rating}
+            onChange={(e) => setRating(Number(e.target.value))}
+            className="mt-2 w-full accent-[var(--accent)]"
+            aria-label="Rating out of 10"
+          />
+        </div>
+        <div className="flex gap-3">
+          <Button variant="ghost" className="flex-1" onClick={onClose} disabled={saving}>
+            Skip
+          </Button>
+          <Button className="flex-1" onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save review"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PlanActions({ entry, size = "size-4" }: { entry: Entry; size?: string }) {
+  const photo = usePhotoAttach(entry.id);
+  const done = useMarkDone(entry);
+  const busy = photo.busy || done.busy;
+  return (
+    <span className="flex shrink-0 items-center gap-3 text-accent">
+      {photo.el}
+      {done.review}
+      {busy ? (
+        <Loader2 className={cn(size, "animate-spin")} />
+      ) : (
+        <>
+          <button type="button" onClick={photo.open} aria-label="Add a photo" className="p-1">
+            <Camera className={size} strokeWidth={1.5} />
+          </button>
+          <button type="button" onClick={done.markDone} aria-label="Mark as done" className="p-1">
+            <CheckCircle className={size} strokeWidth={1.5} />
+          </button>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** Dashed, muted timeline entry for a planned item. Add a photo or mark it done. */
+export function GhostEntry({ entry }: { entry: Entry }) {
+  return (
+    <div className="my-3 flex w-full gap-4 border border-dashed border-rule px-4 py-4 text-left">
+      <span className="timecode w-12 shrink-0 pt-1 opacity-60">{fmtTime(entry.occurred_at)}</span>
+      <span className="min-w-0 flex-1 opacity-60">
         <span className="eyebrow block">Planned · {KIND_LABEL[entry.kind]}</span>
         <span className="display mt-1 block text-2xl leading-tight">{entry.title}</span>
         {entry.place_name && (
@@ -71,33 +202,25 @@ export function GhostEntry({ entry }: { entry: Entry }) {
         )}
         {entry.body && <span className="mt-2 block text-sm text-muted-foreground">{entry.body}</span>}
       </span>
-      <span className="self-center text-accent">
-        {busy ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" strokeWidth={1.5} />}
+      <span className="self-center">
+        <PlanActions entry={entry} />
       </span>
-    </button>
+    </div>
   );
 }
 
 function IdeaCard({ entry }: { entry: Entry }) {
-  const { el, busy, open } = usePhotoAttach(entry.id);
   return (
-    <button
-      type="button"
-      onClick={open}
-      disabled={busy}
-      className="flex w-48 shrink-0 snap-start flex-col border border-dashed border-rule px-4 py-3 text-left"
-    >
-      {el}
+    <div className="flex w-48 shrink-0 snap-start flex-col border border-dashed border-rule px-4 py-3 text-left">
       <span className="eyebrow">{KIND_LABEL[entry.kind]}</span>
       <span className="display mt-1 line-clamp-2 text-xl leading-tight">{entry.title}</span>
       {entry.place_name && (
         <span className="mt-1 truncate text-xs text-muted-foreground">{entry.place_name}</span>
       )}
-      <span className="mt-3 flex items-center gap-1.5 text-[0.65rem] uppercase tracking-[0.14em] text-accent">
-        {busy ? <Loader2 className="size-3 animate-spin" /> : <Camera className="size-3" strokeWidth={1.5} />}
-        Add photo
+      <span className="mt-auto pt-3">
+        <PlanActions entry={entry} />
       </span>
-    </button>
+    </div>
   );
 }
 
