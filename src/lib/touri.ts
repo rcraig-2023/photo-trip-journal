@@ -64,7 +64,7 @@ export function useRestaurants() {
         .from("entries")
         .select("*, entry_photos(id, storage_path, sha256), cities(id, name, country)")
         .eq("kind", "restaurant")
-        .neq("status", "pending")
+        .in("status", ["confirmed"])
         .order("occurred_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as Entry[];
