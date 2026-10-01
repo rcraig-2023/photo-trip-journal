@@ -5,6 +5,7 @@ import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { RankedPlaceCard } from "@/components/RankedPlaceCard";
+import { GhostEntry, SavedIdeas } from "@/components/Planned";
 import { fmtRange, fmtTime, useCity, useEntries, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
@@ -49,11 +50,13 @@ function CityPage() {
   const [filter, setFilter] = useState<Kind | "all">("all");
 
   const items = (entries.data ?? [])
-    .filter((e) => e.status !== "pending")
+    .filter((e) => e.status !== "pending" && !(e.status === "planned" && e.date_unknown))
+    .filter((e) => filter !== "photo" || e.status !== "planned")
     .filter((e) => filter === "all" || e.kind === filter)
     .slice()
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
 
+  const ideas = (entries.data ?? []).filter((e) => e.status === "planned" && e.date_unknown);
   const days = new Map<string, typeof items>();
   for (const e of items) {
     const k = e.occurred_at.slice(0, 10);
@@ -80,6 +83,8 @@ function CityPage() {
         </Link>
       </header>
 
+
+      <SavedIdeas entries={ideas} />
 
       <div className="sticky top-0 z-20 mt-8 flex gap-5 overflow-x-auto border-b border-rule bg-paper/90 px-6 py-3 text-xs uppercase tracking-[0.14em] backdrop-blur-md">
         {FILTERS.map((f) => (
@@ -111,7 +116,9 @@ function CityPage() {
           <ol className="mt-2">
             {list.map((e) => (
               <li key={e.id} className="px-6">
-                {e.kind === "restaurant" || e.kind === "landmark" ? (
+                {e.status === "planned" ? (
+                  <GhostEntry entry={e} />
+                ) : e.kind === "restaurant" || e.kind === "landmark" ? (
                   <div className="py-3">
                     <RankedPlaceCard entry={e} />
                   </div>
