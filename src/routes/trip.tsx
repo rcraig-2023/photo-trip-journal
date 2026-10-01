@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
+import { GhostEntry, ItineraryImporter, SavedIdeas } from "@/components/Planned";
 import type { MapPoint } from "@/components/JourneyMap";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
@@ -45,7 +46,7 @@ function TripPage() {
   const { trip } = useActiveTrip();
   const all = useTrips();
   const cities = useCities(trip?.id);
-  const entries = useEntries({ tripId: trip?.id, limit: 60 });
+  const entries = useEntries({ tripId: trip?.id, limit: 200 });
   const archiveTrips = (all.data ?? []).filter((candidate) => candidate.id !== trip?.id);
   const archiveIds = archiveTrips.map((candidate) => candidate.id);
   const archiveCovers = useQuery({
@@ -108,6 +109,13 @@ function TripPage() {
       </div>
     );
 
+  const all_ = entries.data ?? [];
+  const memories = all_.filter((e) => e.status !== "planned");
+  const ideas = all_.filter((e) => e.status === "planned" && e.date_unknown);
+  const loosePlans = all_
+    .filter((e) => e.status === "planned" && !e.date_unknown && !e.city_id)
+    .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+
   const coverFor = (cityId: string) =>
     entries.data?.find((e) => e.city_id === cityId && e.entry_photos?.length)?.entry_photos?.[0]
       ?.storage_path;
@@ -132,9 +140,20 @@ function TripPage() {
         <h1 className="display mt-5 text-[3rem]">{trip.title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {fmtRange(trip.start_date, trip.end_date)} · {cities.data?.length ?? 0} cities ·{" "}
-          {entries.data?.length ?? 0} memories
+          {memories.length} memories
         </p>
+        <ItineraryImporter trip={trip} cities={cities.data ?? []} />
       </header>
+
+      <SavedIdeas entries={ideas} />
+      {loosePlans.length > 0 && (
+        <section className="mt-8 px-6">
+          <h2 className="eyebrow">Planned</h2>
+          {loosePlans.map((e) => (
+            <GhostEntry key={e.id} entry={e} />
+          ))}
+        </section>
+      )}
 
       <ol className="mt-10">
         {cities.data?.map((c, i) => {

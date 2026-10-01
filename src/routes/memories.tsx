@@ -75,7 +75,7 @@ function MemoriesPage() {
   const [filter, setFilter] = useState<Kind | "all">("all");
 
   const confirmed = (all.data ?? []).filter(
-    (e) => e.status !== "pending" && (filter === "all" || e.kind === filter),
+    (e) => e.status !== "pending" && e.status !== "planned" && (filter === "all" || e.kind === filter),
   );
 
   return (
