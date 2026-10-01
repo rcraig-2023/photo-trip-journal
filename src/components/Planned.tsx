@@ -59,11 +59,8 @@ function useMarkDone(entry: Entry) {
     try {
       const { error } = await supabase
         .from("entries")
-        .update({
-          status: "confirmed",
-          date_unknown: false,
-          ...(entry.date_unknown ? { occurred_at: new Date().toISOString() } : {}),
-        })
+        // Keep the scheduled occurred_at exactly as planned.
+        .update({ status: "confirmed", date_unknown: false })
         .eq("id", entry.id);
       if (error) throw error;
       if (entry.kind === "restaurant") setReviewing(true);

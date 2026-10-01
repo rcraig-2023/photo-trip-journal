@@ -34,7 +34,7 @@ export async function confirmPlannedWithPhoto(entryId: string, file: File) {
     .update({
       status: "confirmed",
       date_unknown: false,
-      occurred_at: opt.meta.capturedAt ?? new Date().toISOString(),
+      ...(opt.meta.capturedAt ? { occurred_at: opt.meta.capturedAt } : {}),
     })
     .eq("id", entryId);
   if (error) throw error;
