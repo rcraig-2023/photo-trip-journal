@@ -103,7 +103,10 @@ function MealReview({ entry, open, onClose }: { entry: Entry; open: boolean; onC
       .update({ price_tier: priceTier, personal_rating: rating })
       .eq("id", entry.id);
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Meal reviewed.");
     onClose();
   }
