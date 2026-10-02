@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
-import { PRICE_LABEL, useRestaurants, type Entry } from "@/lib/touri";
+import { PRICE_LABEL, fmtReviewCount, useRestaurants, type Entry } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dining")({
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/dining")({
   ),
 });
 
-type Sort = "recent" | "rated";
+type Sort = "recent" | "rated" | "google";
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -70,7 +70,10 @@ function DiningPage() {
     return out.sort((a, b) =>
       sort === "rated"
         ? (b.personal_rating ?? -1) - (a.personal_rating ?? -1)
-        : b.occurred_at.localeCompare(a.occurred_at),
+        : sort === "google"
+          ? (b.google_rating ?? -1) - (a.google_rating ?? -1) ||
+            (b.google_review_count ?? 0) - (a.google_review_count ?? 0)
+          : b.occurred_at.localeCompare(a.occurred_at),
     );
   }, [all, city, cuisine, price, sort]);
 
@@ -91,6 +94,9 @@ function DiningPage() {
           </Chip>
           <Chip active={sort === "rated"} onClick={() => setSort("rated")}>
             Highest rated
+          </Chip>
+          <Chip active={sort === "google"} onClick={() => setSort("google")}>
+            Top rated on Google
           </Chip>
           <span className="my-1 w-px shrink-0 bg-rule" />
           <Chip active={city === "all"} onClick={() => setCity("all")}>
@@ -160,6 +166,12 @@ function DiningPage() {
                       </span>
                     )}
                   </div>
+                  {e.google_rating != null && (
+                    <p className="timecode mt-1 text-xs text-foreground">
+                      ★ {Number(e.google_rating).toFixed(1)}
+                      {e.google_review_count ? ` (${fmtReviewCount(e.google_review_count)})` : ""} on Google
+                    </p>
+                  )}
                   <p className="timecode mt-1 text-xs text-muted-foreground">
                     {[
                       e.cities?.name,

@@ -187,3 +187,69 @@ Rules:
             : null,
       }));
   });
+
+const RatingsInput = z.object({ entryIds: z.array(z.string().uuid()).min(1).max(80) });
+
+/**
+ * Looks up Google rating + review count for restaurant entries and saves them.
+ * Never throws for a single failed lookup — ratings are a nice-to-have.
+ */
+export const fetchGoogleRatings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => RatingsInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const key = process.env["GOOGLE_PLACES_API_KEY"];
+    if (!key) return { updated: 0, skipped: "missing_key" as const };
+
+    const { data: rows, error } = await context.supabase
+      .from("entries")
+      .select("id, kind, title, place_name, cities(name, country)")
+      .in("id", data.entryIds)
+      .eq("kind", "restaurant");
+    if (error) throw new Error(error.message);
+
+    let updated = 0;
+    for (const row of rows ?? []) {
+      const r = row as unknown as {
+        id: string;
+        title: string | null;
+        place_name: string | null;
+        cities: { name: string; country: string | null } | null;
+      };
+      const query = [r.title, r.place_name, r.cities?.name, r.cities?.country]
+        .filter(Boolean)
+        .join(", ");
+      if (!r.title || !query) continue;
+      try {
+        const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": key,
+            "X-Goog-FieldMask": "places.rating,places.userRatingCount",
+          },
+          body: JSON.stringify({ textQuery: query, includedType: "restaurant", pageSize: 1 }),
+        });
+        if (!res.ok) {
+          console.error(`Places lookup failed [${res.status}]: ${await res.text()}`);
+          continue;
+        }
+        const json = (await res.json()) as {
+          places?: { rating?: number; userRatingCount?: number }[];
+        };
+        const place = json.places?.[0];
+        if (!place || place.rating == null) continue;
+        const { error: upErr } = await context.supabase
+          .from("entries")
+          .update({
+            google_rating: place.rating,
+            google_review_count: place.userRatingCount ?? 0,
+          })
+          .eq("id", r.id);
+        if (!upErr) updated++;
+      } catch (e) {
+        console.error("Places lookup error", e);
+      }
+    }
+    return { updated, skipped: null };
+  });

@@ -1,3 +1,4 @@
+import { fetchGoogleRatings } from "@/lib/ai.functions";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,7 +84,7 @@ function AddEntry() {
     if (!uid) return;
     setBusy(true);
     const occurred = when ? new Date(when) : new Date();
-    const { error } = await supabase.from("entries").insert({
+    const { data: saved, error } = await supabase.from("entries").insert({
       user_id: uid,
       trip_id: trip?.id ?? null,
       city_id: chosenCity,
@@ -99,8 +100,12 @@ function AddEntry() {
             personal_rating: rated ? rating : null,
           }
         : {}),
-    });
+    }).select("id").single();
     setBusy(false);
+    if (!error && saved && k === "restaurant")
+      void fetchGoogleRatings({ data: { entryIds: [saved.id] } })
+        .then(() => qc.invalidateQueries())
+        .catch(() => {});
     if (error) {
       toast.error(error.message);
       return;
