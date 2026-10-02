@@ -1,3 +1,4 @@
+import { fetchGoogleRatings } from "@/lib/ai.functions";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -281,8 +282,16 @@ export function ItineraryImporter({ trip, cities }: { trip: Trip; cities: City[]
           ...(when ? { occurred_at: new Date(when).toISOString() } : {}),
         };
       });
-      const { error } = await supabase.from("entries").insert(rows);
+      const { data: inserted, error } = await supabase
+        .from("entries")
+        .insert(rows)
+        .select("id, kind");
       if (error) throw error;
+      const restaurantIds = (inserted ?? []).filter((r) => r.kind === "restaurant").map((r) => r.id);
+      if (restaurantIds.length)
+        void fetchGoogleRatings({ data: { entryIds: restaurantIds } })
+          .then(() => qc.invalidateQueries())
+          .catch(() => {});
       const undated = rows.filter((r) => r.date_unknown).length;
       toast.success(
         `Added ${rows.length} planned ${rows.length === 1 ? "place" : "places"}${undated ? ` · ${undated} saved as ideas` : ""}.`,

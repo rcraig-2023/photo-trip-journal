@@ -44,6 +44,8 @@ export type Entry = {
   cuisine_type: string | null;
   price_tier: number | null;
   personal_rating: number | null;
+  google_rating?: number | null;
+  google_review_count?: number | null;
   date_unknown?: boolean;
   entry_photos?: { id: string; storage_path: string; sha256: string | null }[];
   cities?: { id: string; name: string; country: string | null } | null;
@@ -239,4 +241,10 @@ export async function signedUrl(path: string) {
   if (error || !data) throw error ?? new Error("no url");
   urlCache.set(path, data.signedUrl);
   return data.signedUrl;
+}
+
+export function fmtReviewCount(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(n);
 }

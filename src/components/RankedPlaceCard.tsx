@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin, UtensilsCrossed } from "lucide-react";
 import { Photo } from "@/components/Photo";
-import { PRICE_LABEL, fmtTime, type Entry } from "@/lib/touri";
+import { PRICE_LABEL, fmtReviewCount, fmtTime, type Entry } from "@/lib/touri";
 
 export function RankedPlaceCard({ entry }: { entry: Entry }) {
   const photo = entry.entry_photos?.[0];
@@ -38,10 +38,24 @@ export function RankedPlaceCard({ entry }: { entry: Entry }) {
             </h3>
           </div>
 
-          {isRestaurant && entry.personal_rating != null && (
-            <span className="shrink-0 bg-accent px-3 py-2 text-sm font-semibold tabular-nums text-accent-foreground">
-              {Number(entry.personal_rating).toFixed(1)}/10
-            </span>
+          {isRestaurant && (entry.personal_rating != null || entry.google_rating != null) && (
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              {entry.personal_rating != null && (
+                <span className="bg-accent px-3 py-2 text-sm font-semibold tabular-nums text-accent-foreground">
+                  {Number(entry.personal_rating).toFixed(1)}/10
+                </span>
+              )}
+              {entry.google_rating != null && (
+                <span
+                  className="timecode border border-rule px-2 py-1 text-xs tabular-nums text-foreground"
+                  title="Google rating"
+                >
+                  ★ {Number(entry.google_rating).toFixed(1)}
+                  {entry.google_review_count ? ` (${fmtReviewCount(entry.google_review_count)})` : ""}
+                  <span className="ml-1 text-muted-foreground">Google</span>
+                </span>
+              )}
+            </div>
           )}
         </div>
 

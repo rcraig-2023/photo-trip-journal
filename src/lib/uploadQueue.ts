@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { identifyLandmark } from "@/lib/ai.functions";
+import { fetchGoogleRatings, identifyLandmark } from "@/lib/ai.functions";
 import { blobToDataUrl, optimizePhoto } from "@/lib/images";
 
 export type ItemStatus = "waiting" | "optimizing" | "uploading" | "uploaded" | "duplicate" | "failed";
@@ -107,6 +107,15 @@ async function runAi(entryId: string, hash: string, userId: string, dataUrl: str
       ai_error: null,
     })
     .eq("id", entryId);
+
+  // Photo recognised as a restaurant: name it and look up its Google rating.
+  if (result.kind === "restaurant" && result.name) {
+    await supabase
+      .from("entries")
+      .update({ kind: "restaurant", title: result.name, place_name: result.place || null })
+      .eq("id", entryId);
+    await fetchGoogleRatings({ data: { entryIds: [entryId] } }).catch(() => {});
+  }
 }
 
 /** Re-run recognition for a single already-uploaded photo. */

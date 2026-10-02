@@ -1,0 +1,1 @@
+ALTER TABLE public.entries ADD COLUMN IF NOT EXISTS google_rating numeric CHECK (google_rating IS NULL OR (google_rating >= 0 AND google_rating <= 5)), ADD COLUMN IF NOT EXISTS google_review_count integer CHECK (google_review_count IS NULL OR google_review_count >= 0);
