@@ -117,6 +117,8 @@ export type Database = {
           created_at: string
           cuisine_type: string | null
           date_unknown: boolean
+          google_rating: number | null
+          google_review_count: number | null
           id: string
           kind: string
           landmark_id: string | null
@@ -143,6 +145,8 @@ export type Database = {
           created_at?: string
           cuisine_type?: string | null
           date_unknown?: boolean
+          google_rating?: number | null
+          google_review_count?: number | null
           id?: string
           kind?: string
           landmark_id?: string | null
@@ -169,6 +173,8 @@ export type Database = {
           created_at?: string
           cuisine_type?: string | null
           date_unknown?: boolean
+          google_rating?: number | null
+          google_review_count?: number | null
           id?: string
           kind?: string
           landmark_id?: string | null
