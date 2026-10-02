@@ -2,7 +2,13 @@ import { fetchGoogleRatings } from "@/lib/ai.functions";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, CheckCircle, Loader2 } from "lucide-react";
+import { Camera, CheckCircle, Loader2, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -164,6 +170,99 @@ function MealReview({ entry, open, onClose }: { entry: Entry; open: boolean; onC
   );
 }
 
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function EditTime({ entry, open, onClose }: { entry: Entry; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [when, setWhen] = useState(entry.date_unknown ? "" : toLocalInput(entry.occurred_at));
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const d = new Date(when);
+    if (!when || isNaN(d.getTime())) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("entries")
+      .update({ occurred_at: d.toISOString(), date_unknown: false })
+      .eq("id", entry.id);
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(entry.date_unknown ? "Scheduled on the timeline." : "Time updated.");
+    onClose();
+    await qc.invalidateQueries();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && !saving && onClose()}>
+      <DialogContent className="bg-paper">
+        <DialogHeader>
+          <span className="eyebrow">{entry.date_unknown ? "Schedule idea" : "Edit time"}</span>
+          <DialogTitle className="display text-3xl font-normal">{entry.title}</DialogTitle>
+          <DialogDescription>Pick a day and time for this plan.</DialogDescription>
+        </DialogHeader>
+        <input
+          type="datetime-local"
+          value={when}
+          onChange={(e) => setWhen(e.target.value)}
+          className="w-full border-b border-rule bg-transparent py-2 text-base outline-none focus:border-accent"
+          aria-label="Date and time"
+        />
+        <div className="flex gap-3">
+          <Button variant="ghost" className="flex-1" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button className="flex-1" onClick={save} disabled={saving || !when}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PlanMenu({ entry, size }: { entry: Entry; size: string }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+
+  async function remove() {
+    const { error } = await supabase.from("entries").delete().eq("id", entry.id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Plan deleted.");
+    await qc.invalidateQueries();
+  }
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="More options" className="p-1">
+            <MoreVertical className={size} strokeWidth={1.5} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="bg-paper">
+          <DropdownMenuItem onSelect={() => setEditing(true)}>
+            {entry.date_unknown ? "Schedule…" : "Edit time"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={remove} className="text-destructive focus:text-destructive">
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {editing && <EditTime entry={entry} open={editing} onClose={() => setEditing(false)} />}
+    </>
+  );
+}
+
 function PlanActions({ entry, size = "size-4" }: { entry: Entry; size?: string }) {
   const photo = usePhotoAttach(entry.id);
   const done = useMarkDone(entry);
@@ -182,6 +281,7 @@ function PlanActions({ entry, size = "size-4" }: { entry: Entry; size?: string }
           <button type="button" onClick={done.markDone} aria-label="Mark as done" className="p-1">
             <CheckCircle className={size} strokeWidth={1.5} />
           </button>
+          <PlanMenu entry={entry} size={size} />
         </>
       )}
     </span>
