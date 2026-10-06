@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchGoogleRatings, identifyLandmark } from "@/lib/ai.functions";
-import { blobToDataUrl, optimizePhoto } from "@/lib/images";
+import { blobToDataUrl, isHeic, optimizePhoto } from "@/lib/images";
 
 export type ItemStatus = "waiting" | "optimizing" | "uploading" | "uploaded" | "duplicate" | "failed";
 export type AiStatus = "waiting" | "running" | "done" | "failed" | "skipped";
