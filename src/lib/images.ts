@@ -94,14 +94,55 @@ function encode(canvas: HTMLCanvasElement, type: string, quality: number) {
   return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
+/** iPhone photos often arrive as HEIC/HEIF, which most browsers cannot decode. */
+export function isHeic(file: File) {
+  const mime = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  return (
+    mime === "image/heic" ||
+    mime === "image/heif" ||
+    mime === "image/heic-sequence" ||
+    mime === "image/heif-sequence" ||
+    /\.hei[cf]$/.test(name)
+  );
+}
+
+/** Upload the file untouched when the browser can't decode it (e.g. HEIC). */
+async function rawPhoto(file: File): Promise<Optimized> {
+  const ext = (file.name.split(".").pop() || "heic").toLowerCase();
+  return {
+    blob: file,
+    mime: file.type || "image/heic",
+    ext,
+    width: 0,
+    height: 0,
+    hash: await sha256(file),
+    meta: {
+      capturedAt: new Date(file.lastModified || Date.now()).toISOString(),
+      lat: null,
+      lng: null,
+    },
+  };
+}
+
 /**
  * Downscale to <= 2000px, re-encode as WebP (JPEG fallback) and fingerprint.
  * Re-drawing through a canvas also drops EXIF and other metadata, so we read
- * what we need from the original first.
+ * what we need from the original first. HEIC/HEIF files (and anything the
+ * browser fails to decode) are uploaded raw instead of throwing.
  */
 export async function optimizePhoto(file: File): Promise<Optimized> {
+  if (isHeic(file)) return rawPhoto(file);
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // Browser can't decode this format — keep the original bytes.
+    return rawPhoto(file);
+  }
+
   const meta = await readExif(file);
-  const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);
@@ -110,7 +151,10 @@ export async function optimizePhoto(file: File): Promise<Optimized> {
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not read that photo.");
+  if (!ctx) {
+    bitmap.close?.();
+    return rawPhoto(file);
+  }
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close?.();
 
@@ -120,7 +164,7 @@ export async function optimizePhoto(file: File): Promise<Optimized> {
     mime = "image/jpeg";
     blob = await encode(canvas, mime, 0.82);
   }
-  if (!blob) throw new Error("Could not prepare that photo.");
+  if (!blob) return rawPhoto(file);
 
   return {
     blob,
