@@ -160,6 +160,13 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
   }));
   set({ running: true, phase: "preparing", items, total: files.length, uploaded: 0, failed: 0 });
 
+  const heicCount = files.filter(isHeic).length;
+  if (heicCount) {
+    toast(
+      `${heicCount} iPhone HEIC photo${heicCount > 1 ? "s" : ""} will be uploaded as-is — your browser can't shrink them.`,
+    );
+  }
+
   const aiJobs: { entryId: string; hash: string; dataUrl: string }[] = [];
   const CONCURRENCY = 3;
   let cursor = 0;
@@ -227,12 +234,10 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
         set({ uploaded: state.uploaded + 1 });
         onChanged?.();
       } catch (err) {
-        patch(item.id, {
-          status: "failed",
-          ai: "skipped",
-          error: err instanceof Error ? err.message : "Upload failed",
-        });
+        const message = err instanceof Error ? err.message : "Upload failed";
+        patch(item.id, { status: "failed", ai: "skipped", error: message });
         set({ failed: state.failed + 1 });
+        toast.error(`Couldn't add “${file.name}”`, { description: message });
       }
     }
   }
