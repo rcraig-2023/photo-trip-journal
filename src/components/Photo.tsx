@@ -16,9 +16,16 @@ async function renderableUrl(path: string): Promise<string> {
     const res = await fetch(url);
     if (!res.ok) throw new Error("fetch failed");
     const blob = await res.blob();
-    const { default: heic2any } = await import("heic2any");
-    const converted = await heic2any({ blob, toType: "image/jpeg", quality: 0.85 });
-    const out = Array.isArray(converted) ? converted[0] : converted;
+    let out: Blob | undefined;
+    try {
+      // Newer libheif-based decoder — handles iPhone HEVC variants heic2any can't.
+      const { heicTo } = await import("heic-to");
+      out = await heicTo({ blob, type: "image/jpeg", quality: 0.85 });
+    } catch {
+      const { default: heic2any } = await import("heic2any");
+      const converted = await heic2any({ blob, toType: "image/jpeg", quality: 0.85 });
+      out = Array.isArray(converted) ? converted[0] : converted;
+    }
     if (!out) throw new Error("conversion failed");
     return await blobToDataUrl(out);
   } catch {
