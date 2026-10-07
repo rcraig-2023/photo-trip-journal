@@ -207,9 +207,11 @@ function InboxTriage({ entries }: { entries: Entry[] }) {
       const uid = auth.user?.id;
       if (!uid) throw new Error("Please sign in again to confirm these memories.");
 
-      const recognized = selectedEntries.filter((entry) => !!entry.ai_suggestion);
+      const isLandmarkSuggestion = (entry: (typeof selectedEntries)[number]) =>
+        !!entry.ai_suggestion && entry.kind !== "restaurant";
+      const recognized = selectedEntries.filter(isLandmarkSuggestion);
       const ordinaryIds = selectedEntries
-        .filter((entry) => !entry.ai_suggestion)
+        .filter((entry) => !isLandmarkSuggestion(entry))
         .map((entry) => entry.id);
 
       if (ordinaryIds.length) {
@@ -434,7 +436,8 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
       const uid = auth.user?.id;
       if (!uid) return;
       const finalName = useSuggestion ? (suggestion ?? title) : title;
-      const finalKind: Kind = useSuggestion && suggestion ? "landmark" : kind;
+      const finalKind: Kind =
+        useSuggestion && suggestion && entry.kind !== "restaurant" ? "landmark" : kind;
       let landmarkId: string | null = null;
 
       if (finalKind === "landmark" && finalName) {
