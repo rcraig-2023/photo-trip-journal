@@ -163,7 +163,8 @@ Rules:
 - occurred_at is local time as "YYYY-MM-DDTHH:MM". If a day is implied but no time, use a sensible time (breakfast 09:00, lunch 13:00, dinner 20:00, sights 11:00).
 - If no date is implied at all, occurred_at MUST be null. Never invent dates.
 - "city" must be one of the listed cities when it clearly matches, otherwise "".
-- "note" is a short plain sentence from the source text, or "".`,
+- "note" is a short plain sentence from the source text, or "".
+- You must never create duplicate events. If a location or activity is mentioned multiple times for the same day, consolidate it into a single entry.`,
         },
         { role: "user", content: data.text },
       ],
