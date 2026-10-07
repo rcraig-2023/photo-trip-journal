@@ -38,9 +38,9 @@ export function RankedPlaceCard({ entry }: { entry: Entry }) {
             </h3>
           </div>
 
-          {isRestaurant && (entry.personal_rating != null || entry.google_rating != null) && (
+          {((isRestaurant && entry.personal_rating != null) || entry.google_rating != null) && (
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {entry.personal_rating != null && (
+              {isRestaurant && entry.personal_rating != null && (
                 <span className="bg-accent px-3 py-2 text-sm font-semibold tabular-nums text-accent-foreground">
                   {Number(entry.personal_rating).toFixed(1)}/10
                 </span>

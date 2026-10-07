@@ -109,14 +109,76 @@ async function runAi(entryId: string, hash: string, userId: string, dataUrl: str
     })
     .eq("id", entryId);
 
-  // Photo recognised as a restaurant: name it and look up its Google rating.
+  // Photo recognised as a restaurant: attach to a matching planned entry if one
+  // exists, otherwise name this entry. Then look up its Google rating.
   if (result.kind === "restaurant" && result.name) {
-    await supabase
-      .from("entries")
-      .update({ kind: "restaurant", title: result.name, place_name: result.place || null })
-      .eq("id", entryId);
-    await fetchGoogleRatings({ data: { entryIds: [entryId] } }).catch(() => {});
+    const target = await attachToPlannedMatch(entryId, result.name);
+    if (!target) {
+      await supabase
+        .from("entries")
+        .update({ kind: "restaurant", title: result.name, place_name: result.place || null })
+        .eq("id", entryId);
+    }
+    const ratedId = target ?? entryId;
+    try {
+      await fetchGoogleRatings({ data: { entryIds: [ratedId] } });
+    } catch (e) {
+      console.error("Google rating lookup failed", e);
+    }
   }
+}
+
+const norm = (s: string | null | undefined) =>
+  (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+
+function namesMatch(a: string, b: string) {
+  const x = norm(a);
+  const y = norm(b);
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
+}
+
+/**
+ * Moves the photo onto a planned entry in the same trip whose name matches,
+ * confirms it (keeping its trip, city and scheduled time) and removes the
+ * temporary photo entry. Returns the planned entry id, or null if no match.
+ */
+async function attachToPlannedMatch(photoEntryId: string, name: string): Promise<string | null> {
+  const { data: src } = await supabase
+    .from("entries")
+    .select("id, trip_id, city_id")
+    .eq("id", photoEntryId)
+    .maybeSingle();
+  if (!src?.trip_id) return null;
+
+  const { data: plans } = await supabase
+    .from("entries")
+    .select("id, title, place_name, city_id, kind")
+    .eq("trip_id", src.trip_id)
+    .eq("status", "planned");
+  const match = (plans ?? []).find(
+    (p) => namesMatch(p.title ?? "", name) || namesMatch(p.place_name ?? "", name),
+  );
+  if (!match) return null;
+
+  const { error: moveErr } = await supabase
+    .from("entry_photos")
+    .update({ entry_id: match.id })
+    .eq("entry_id", photoEntryId);
+  if (moveErr) return null;
+
+  await supabase
+    .from("entries")
+    .update({
+      status: "confirmed",
+      date_unknown: false,
+      kind: "restaurant",
+      trip_id: src.trip_id,
+      city_id: match.city_id ?? src.city_id,
+    })
+    .eq("id", match.id);
+  await supabase.from("entries").delete().eq("id", photoEntryId);
+  return match.id;
 }
 
 /** Re-run recognition for a single already-uploaded photo. */
