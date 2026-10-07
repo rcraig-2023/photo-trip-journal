@@ -163,7 +163,8 @@ Rules:
 - occurred_at is local time as "YYYY-MM-DDTHH:MM". If a day is implied but no time, use a sensible time (breakfast 09:00, lunch 13:00, dinner 20:00, sights 11:00).
 - If no date is implied at all, occurred_at MUST be null. Never invent dates.
 - "city" must be one of the listed cities when it clearly matches, otherwise "".
-- "note" is a short plain sentence from the source text, or "".`,
+- "note" is a short plain sentence from the source text, or "".
+- You must never create duplicate events. If a location or activity is mentioned multiple times for the same day, consolidate it into a single entry.`,
         },
         { role: "user", content: data.text },
       ],
@@ -172,7 +173,7 @@ Rules:
     const parsed = parseJson<{ items?: Partial<ItineraryItem>[] }>(raw);
     if (!parsed?.items) throw new Error("Could not read that itinerary. Try pasting it again.");
 
-    return parsed.items
+    const items = parsed.items
       .filter((i) => i.title && typeof i.title === "string")
       .slice(0, 80)
       .map<ItineraryItem>((i) => ({
@@ -186,7 +187,36 @@ Rules:
             ? i.occurred_at.slice(0, 16)
             : null,
       }));
+
+    return dedupeItinerary(items);
   });
+
+const normTitle = (s: string) =>
+  s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
+
+const TWO_HOURS = 2 * 60 * 60 * 1000;
+
+/**
+ * Drops duplicate parsed items: same (or contained) title on the same day
+ * within a 2-hour window, or same title when both lack a time. Keeps the
+ * first occurrence.
+ */
+function dedupeItinerary(items: ItineraryItem[]): ItineraryItem[] {
+  const kept: ItineraryItem[] = [];
+  for (const item of items) {
+    const title = normTitle(item.title);
+    if (!title) continue;
+    const dupe = kept.some((k) => {
+      const kt = normTitle(k.title);
+      if (!(kt === title || kt.includes(title) || title.includes(kt))) return false;
+      if (!item.occurred_at || !k.occurred_at) return true;
+      if (item.occurred_at.slice(0, 10) !== k.occurred_at.slice(0, 10)) return false;
+      return Math.abs(new Date(item.occurred_at).getTime() - new Date(k.occurred_at).getTime()) <= TWO_HOURS;
+    });
+    if (!dupe) kept.push(item);
+  }
+  return kept;
+}
 
 const RatingsInput = z.object({ entryIds: z.array(z.string().uuid()).min(1).max(80) });
 
