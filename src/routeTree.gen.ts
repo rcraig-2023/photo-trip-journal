@@ -19,7 +19,9 @@ import { Route as AddKindRouteImport } from './routes/add.$kind'
 import { Route as AddPhotosRouteImport } from './routes/add.photos'
 import { Route as CityCityIdRouteImport } from './routes/city.$cityId'
 import { Route as EntryEntryIdRouteImport } from './routes/entry.$entryId'
+import { Route as TripIndexRouteImport } from './routes/trip.index'
 import { Route as TripsNewRouteImport } from './routes/trips.new'
+import { Route as TripTripIdExportRouteImport } from './routes/trip.$tripId.export'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,10 +73,20 @@ const EntryEntryIdRoute = EntryEntryIdRouteImport.update({
   path: '/entry/$entryId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TripIndexRoute = TripIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TripRoute,
+} as any)
 const TripsNewRoute = TripsNewRouteImport.update({
   id: '/trips/new',
   path: '/trips/new',
   getParentRoute: () => rootRouteImport,
+} as any)
+const TripTripIdExportRoute = TripTripIdExportRouteImport.update({
+  id: '/$tripId/export',
+  path: '/$tripId/export',
+  getParentRoute: () => TripRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -83,12 +95,14 @@ export interface FileRoutesByFullPath {
   '/dining': typeof DiningRoute
   '/memories': typeof MemoriesRoute
   '/settings': typeof SettingsRoute
-  '/trip': typeof TripRoute
+  '/trip': typeof TripRouteWithChildren
   '/add/$kind': typeof AddKindRoute
   '/add/photos': typeof AddPhotosRoute
   '/city/$cityId': typeof CityCityIdRoute
   '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
+  '/trip/': typeof TripIndexRoute
+  '/trip/$tripId/export': typeof TripTripIdExportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -96,12 +110,13 @@ export interface FileRoutesByTo {
   '/dining': typeof DiningRoute
   '/memories': typeof MemoriesRoute
   '/settings': typeof SettingsRoute
-  '/trip': typeof TripRoute
   '/add/$kind': typeof AddKindRoute
   '/add/photos': typeof AddPhotosRoute
   '/city/$cityId': typeof CityCityIdRoute
   '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
+  '/trip': typeof TripIndexRoute
+  '/trip/$tripId/export': typeof TripTripIdExportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -110,12 +125,14 @@ export interface FileRoutesById {
   '/dining': typeof DiningRoute
   '/memories': typeof MemoriesRoute
   '/settings': typeof SettingsRoute
-  '/trip': typeof TripRoute
+  '/trip': typeof TripRouteWithChildren
   '/add/$kind': typeof AddKindRoute
   '/add/photos': typeof AddPhotosRoute
   '/city/$cityId': typeof CityCityIdRoute
   '/entry/$entryId': typeof EntryEntryIdRoute
   '/trips/new': typeof TripsNewRoute
+  '/trip/': typeof TripIndexRoute
+  '/trip/$tripId/export': typeof TripTripIdExportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +148,8 @@ export interface FileRouteTypes {
     | '/city/$cityId'
     | '/entry/$entryId'
     | '/trips/new'
+    | '/trip/'
+    | '/trip/$tripId/export'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -138,12 +157,13 @@ export interface FileRouteTypes {
     | '/dining'
     | '/memories'
     | '/settings'
-    | '/trip'
     | '/add/$kind'
     | '/add/photos'
     | '/city/$cityId'
     | '/entry/$entryId'
     | '/trips/new'
+    | '/trip'
+    | '/trip/$tripId/export'
   id:
     | '__root__'
     | '/'
@@ -157,6 +177,8 @@ export interface FileRouteTypes {
     | '/city/$cityId'
     | '/entry/$entryId'
     | '/trips/new'
+    | '/trip/'
+    | '/trip/$tripId/export'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -165,7 +187,7 @@ export interface RootRouteChildren {
   DiningRoute: typeof DiningRoute
   MemoriesRoute: typeof MemoriesRoute
   SettingsRoute: typeof SettingsRoute
-  TripRoute: typeof TripRoute
+  TripRoute: typeof TripRouteWithChildren
   AddKindRoute: typeof AddKindRoute
   AddPhotosRoute: typeof AddPhotosRoute
   CityCityIdRoute: typeof CityCityIdRoute
@@ -245,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EntryEntryIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trip/': {
+      id: '/trip/'
+      path: '/'
+      fullPath: '/trip/'
+      preLoaderRoute: typeof TripIndexRouteImport
+      parentRoute: typeof TripRoute
+    }
     '/trips/new': {
       id: '/trips/new'
       path: '/trips/new'
@@ -252,8 +281,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TripsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trip/$tripId/export': {
+      id: '/trip/$tripId/export'
+      path: '/$tripId/export'
+      fullPath: '/trip/$tripId/export'
+      preLoaderRoute: typeof TripTripIdExportRouteImport
+      parentRoute: typeof TripRoute
+    }
   }
 }
+
+interface TripRouteChildren {
+  TripIndexRoute: typeof TripIndexRoute
+  TripTripIdExportRoute: typeof TripTripIdExportRoute
+}
+
+const TripRouteChildren: TripRouteChildren = {
+  TripIndexRoute: TripIndexRoute,
+  TripTripIdExportRoute: TripTripIdExportRoute,
+}
+
+const TripRouteWithChildren = TripRoute._addFileChildren(TripRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -261,7 +309,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiningRoute: DiningRoute,
   MemoriesRoute: MemoriesRoute,
   SettingsRoute: SettingsRoute,
-  TripRoute: TripRoute,
+  TripRoute: TripRouteWithChildren,
   AddKindRoute: AddKindRoute,
   AddPhotosRoute: AddPhotosRoute,
   CityCityIdRoute: CityCityIdRoute,
