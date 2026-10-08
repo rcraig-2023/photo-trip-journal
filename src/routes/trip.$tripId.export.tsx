@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -5,7 +6,10 @@ import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
 import { RankedPlaceCard } from "@/components/RankedPlaceCard";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { fmtDay, fmtRange, fmtTime, type City, type Entry, type Trip } from "@/lib/touri";
+
+type Layout = "standard" | "compact";
 
 /**
  * Read-only, print-ready Timelined Album. No app shell, no nav, no filters.
@@ -119,20 +123,47 @@ function ExportPage() {
     <div className="mx-auto min-h-screen w-full max-w-2xl bg-paper">
       {/* Screen-only toolbar */}
       <div className="sticky top-0 z-20 border-b border-rule bg-paper/95 backdrop-blur print:hidden">
-        <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex items-center justify-between gap-3 px-6 py-3">
           <Link
             to="/trip"
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground"
+            className="inline-flex shrink-0 items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground"
           >
             <ArrowLeft className="size-4" strokeWidth={1.5} /> Trip
           </Link>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 bg-foreground px-4 py-2.5 text-xs uppercase tracking-[0.14em] text-paper transition-opacity hover:opacity-85"
-          >
-            <Printer className="size-4" strokeWidth={1.5} /> Download as PDF
-          </button>
+
+          <div className="flex items-center gap-2">
+            {entries.length > 1 && (
+              <div
+                role="group"
+                aria-label="Album layout"
+                className="flex border border-rule bg-paper"
+              >
+                {(["standard", "compact"] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    aria-pressed={layout === l}
+                    onClick={() => setLayout(l)}
+                    className={cn(
+                      "px-3 py-2 text-[0.6875rem] uppercase tracking-[0.14em] transition-colors",
+                      layout === l
+                        ? "bg-foreground text-paper"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {l === "standard" ? "Standard" : "Compact grid"}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex shrink-0 items-center gap-2 bg-foreground px-4 py-2.5 text-xs uppercase tracking-[0.14em] text-paper transition-opacity hover:opacity-85"
+            >
+              <Printer className="size-4" strokeWidth={1.5} /> Download as PDF
+            </button>
+          </div>
         </div>
       </div>
 
