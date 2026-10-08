@@ -143,13 +143,15 @@ function TripPage() {
           {memories.length} memories
         </p>
         <ItineraryImporter trip={trip} cities={cities.data ?? []} />
-        <Link
-          to="/trip/$tripId/export"
-          params={{ tripId: trip.id }}
-          className="mt-4 inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-accent"
-        >
-          Download as PDF →
-        </Link>
+        <div className="mt-4">
+          <Link
+            to="/trip/$tripId/export"
+            params={{ tripId: trip.id }}
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-accent"
+          >
+            Download as PDF →
+          </Link>
+        </div>
       </header>
 
       <SavedIdeas entries={ideas} />
