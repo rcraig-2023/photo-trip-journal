@@ -167,7 +167,7 @@ function ExportPage() {
             <ArrowLeft className="size-4" strokeWidth={1.5} /> Trip
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             {entries.length > 1 && (
               <div
                 role="group"
@@ -196,14 +196,14 @@ function ExportPage() {
               type="button"
               onClick={shareAlbum}
               aria-label="Share digital album"
-              className="inline-flex shrink-0 items-center gap-2 border border-rule bg-paper px-4 py-2.5 text-xs uppercase tracking-[0.14em] text-foreground transition-colors hover:border-foreground"
+              className="inline-flex shrink-0 items-center gap-2 border border-rule bg-paper px-3 py-2.5 text-xs uppercase tracking-[0.14em] text-foreground transition-colors hover:border-foreground sm:px-4"
             >
               <Share2 className="size-4" strokeWidth={1.5} /> Share album
             </button>
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex shrink-0 items-center gap-2 bg-foreground px-4 py-2.5 text-xs uppercase tracking-[0.14em] text-paper transition-opacity hover:opacity-85"
+              className="inline-flex shrink-0 items-center gap-2 bg-foreground px-3 py-2.5 text-xs uppercase tracking-[0.14em] text-paper transition-opacity hover:opacity-85 sm:px-4"
             >
               <Printer className="size-4" strokeWidth={1.5} /> Download as PDF
             </button>
