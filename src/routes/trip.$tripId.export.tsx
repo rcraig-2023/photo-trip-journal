@@ -39,6 +39,8 @@ export const Route = createFileRoute("/trip/$tripId/export")({
 
 function ExportPage() {
   const { tripId } = Route.useParams();
+  const [layout, setLayout] = useState<Layout>("standard");
+
 
   const tripQ = useQuery({
     queryKey: ["export-trip", tripId],
@@ -199,7 +201,7 @@ function ExportPage() {
                 {fmtRange(c.start_date, c.end_date)}
               </p>
             </div>
-            <DayGroups entries={cityEntries} />
+            <DayGroups entries={cityEntries} layout={layout} />
           </section>
         );
       })}
@@ -209,7 +211,7 @@ function ExportPage() {
           <div className="break-inside-avoid border-t border-rule pt-6">
             <h2 className="display text-4xl">Along the way</h2>
           </div>
-          <DayGroups entries={loose} />
+          <DayGroups entries={loose} layout={layout} />
         </section>
       )}
 
@@ -220,7 +222,7 @@ function ExportPage() {
   );
 }
 
-function DayGroups({ entries }: { entries: Entry[] }) {
+function DayGroups({ entries, layout }: { entries: Entry[]; layout: Layout }) {
   const groups: { day: string; items: Entry[] }[] = [];
   for (const e of entries) {
     const day = e.occurred_at.slice(0, 10);
@@ -234,7 +236,14 @@ function DayGroups({ entries }: { entries: Entry[] }) {
       {groups.map((g) => (
         <div key={g.day}>
           <h3 className="eyebrow break-inside-avoid">{fmtDay(g.items[0]!.occurred_at)}</h3>
-          <div className="mt-5 space-y-9">
+          <div
+            className={
+              layout === "compact"
+                ? // Two columns on screen; multi-column at print so cards never split.
+                  "mt-5 grid grid-cols-2 gap-4 print:block print:columns-2 print:gap-4"
+                : "mt-5 space-y-9"
+            }
+          >
             {g.items.map((e) => (
               <ExportEntry key={e.id} entry={e} />
             ))}
