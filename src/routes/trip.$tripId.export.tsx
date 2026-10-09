@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Printer, Share2 } from "lucide-react";
+import { toast } from "sonner";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
 import { RankedPlaceCard } from "@/components/RankedPlaceCard";
@@ -121,11 +122,44 @@ function ExportPage() {
     }
   }
 
+  const primaryCity =
+    cities.find((c) => (byCity.get(c.id)?.length ?? 0) > 0)?.name ?? trip.title;
+  const shareText = [
+    fmtRange(trip.start_date, trip.end_date),
+    cities.length
+      ? `${cities.length} ${cities.length === 1 ? "city" : "cities"}`
+      : "",
+    `${entries.length} ${entries.length === 1 ? "memory" : "memories"}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  /** Native share sheet where the browser supports it; otherwise copy the link. */
+  async function shareAlbum() {
+    const url = new URL(`/trip/${tripId}/export`, window.location.href).toString();
+    try {
+      if (typeof navigator.share === "function" && navigator.canShare?.({ url })) {
+        await navigator.share({
+          title: `Check out my trip to ${primaryCity}!`,
+          text: shareText,
+          url,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success("Album link copied — paste it anywhere.");
+    } catch (err) {
+      // Dismissing the system share sheet is not a failure.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      toast.error("Couldn't share automatically — copy the address from your browser bar.");
+    }
+  }
+
   return (
     <div className="mx-auto min-h-screen w-full max-w-2xl bg-paper">
       {/* Screen-only toolbar */}
       <div className="sticky top-0 z-20 border-b border-rule bg-paper/95 backdrop-blur print:hidden">
-        <div className="flex items-center justify-between gap-3 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
           <Link
             to="/trip"
             className="inline-flex shrink-0 items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground"
@@ -158,6 +192,14 @@ function ExportPage() {
                 ))}
               </div>
             )}
+            <button
+              type="button"
+              onClick={shareAlbum}
+              aria-label="Share digital album"
+              className="inline-flex shrink-0 items-center gap-2 border border-rule bg-paper px-4 py-2.5 text-xs uppercase tracking-[0.14em] text-foreground transition-colors hover:border-foreground"
+            >
+              <Share2 className="size-4" strokeWidth={1.5} /> Share album
+            </button>
             <button
               type="button"
               onClick={() => window.print()}
