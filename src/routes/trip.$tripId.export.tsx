@@ -196,9 +196,11 @@ function ExportPage() {
               type="button"
               onClick={shareAlbum}
               aria-label="Share digital album"
+              title="Share digital album"
               className="inline-flex shrink-0 items-center gap-2 border border-rule bg-paper px-3 py-2.5 text-xs uppercase tracking-[0.14em] text-foreground transition-colors hover:border-foreground sm:px-4"
             >
-              <Share2 className="size-4" strokeWidth={1.5} /> Share album
+              <Share2 className="size-4" strokeWidth={1.5} />
+              <span className="hidden sm:inline">Share album</span>
             </button>
             <button
               type="button"
