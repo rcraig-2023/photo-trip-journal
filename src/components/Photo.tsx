@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { signedUrl } from "@/lib/touri";
 import { blobToDataUrl } from "@/lib/images";
@@ -38,29 +39,55 @@ export function Photo({
   path,
   alt,
   className,
+  loading = "lazy",
+  onSettled,
 }: {
   path?: string | null | undefined;
   alt: string;
   className?: string;
+  loading?: "lazy" | "eager";
+  onSettled?: (status: "ready" | "error") => void;
 }) {
+  const [failedSource, setFailedSource] = useState<string | null>(null);
   const { data, isError } = useQuery({
     queryKey: ["photo", path],
     enabled: !!path,
     staleTime: 30 * 60 * 1000,
     retry: 1,
-    queryFn: () => renderableUrl(path!),
+    queryFn: () => {
+      if (!path) throw new Error("No photo path");
+      return renderableUrl(path);
+    },
   });
+
+  useEffect(() => {
+    if (isError) onSettled?.("error");
+  }, [isError, onSettled]);
 
   return (
     <div className={cn("overflow-hidden bg-muted", className)}>
-      {data ? (
+      {data && failedSource !== data ? (
         <img
           src={data}
           alt={alt}
-          loading="lazy"
+          loading={loading}
+          onLoad={async (event) => {
+            const image = event.currentTarget;
+            try {
+              await image.decode();
+              onSettled?.("ready");
+            } catch {
+              setFailedSource(data);
+              onSettled?.("error");
+            }
+          }}
+          onError={() => {
+            setFailedSource(data);
+            onSettled?.("error");
+          }}
           className="h-full w-full object-cover"
         />
-      ) : isError ? (
+      ) : isError || failedSource === data ? (
         <div className="flex h-full w-full items-center justify-center bg-muted">
           <ImageOff className="size-5 text-muted-foreground/50" strokeWidth={1.5} />
         </div>
