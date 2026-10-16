@@ -144,12 +144,57 @@
 
 /* Print / PDF export: keep ink-on-paper colors and avoid chopped cards. */
 @media print {
+  @page {
+    size: letter;
+    margin: 12mm;
+  }
+
   body {
-    background: white;
+    background: var(--paper);
   }
 
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  .album {
+    --paper: oklch(1 0 0);
+    --foreground: oklch(0.24 0.014 60);
+    --muted-foreground: oklch(0.45 0.018 66);
+    --accent: oklch(0.5 0.115 44);
+    --rule: oklch(0.83 0.014 78);
+    max-width: none;
+    min-height: 0;
+    background: var(--paper);
+    color: var(--foreground);
+  }
+
+  .album-content { padding: 0; }
+  .album-toolbar { display: none; }
+  .album-masthead { padding-top: 0; padding-bottom: 5mm; }
+  .album-masthead h1 { font-size: 32pt; }
+  .album-chapter { margin-top: 5mm; }
+  .album-city-header { padding: 2mm 0; }
+  .album-city-header h2 { font-size: 20pt; }
+  .album-day { margin-top: 3mm; }
+  .album-grid { margin-top: 2mm; gap: 4mm; }
+  .album-feature .album-grid { grid-template-columns: minmax(0, 1fr); gap: 6mm; }
+  .album-magazine .album-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .album-contact .album-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .album-card, .album-strip { break-inside: avoid; page-break-inside: avoid; }
+  .album-city-header, .album-day-header {
+    break-inside: avoid;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .album-feature .album-card-title { font-size: 22pt; }
+  .album-magazine .album-card-title { font-size: 13pt; }
+  .album-contact .album-card-title { font-size: 10pt; }
+  .album-meta { font-size: 7pt; gap: 0 2mm; }
+  .album-feature .album-body { font-size: 10pt; }
+  .album-magazine .album-body { font-size: 8pt; }
+  .album-contact .album-body { font-size: 7pt; line-height: 1.35; }
+  .album-strip { padding: 2mm 0; }
+  .album-strip-body { max-width: 100%; }
 }
