@@ -28,6 +28,11 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ensureEnrichment, findOrCreateLandmark } from "@/lib/landmarks";
+import {
+  deleteGuestEntries,
+  updateGuestEntriesStatus,
+  updateGuestEntry,
+} from "@/lib/guestStore";
 import { retryRecognition } from "@/lib/uploadQueue";
 import { fmtTime, useActiveTrip, useCities, useEntries, type Entry, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
@@ -204,8 +209,19 @@ function InboxTriage({ entries }: { entries: Entry[] }) {
     setBusy(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
-      if (!uid) throw new Error("Please sign in again to confirm these memories.");
+      const uid = auth.user?.id ?? null;
+
+      if (!uid) {
+        updateGuestEntriesStatus(
+          selectedEntries.map((entry) => entry.id),
+          "confirmed",
+        );
+        setSelected(new Set());
+        toast.success(
+          `${selectedEntries.length} ${selectedEntries.length === 1 ? "memory" : "memories"} confirmed in guest preview.`,
+        );
+        return;
+      }
 
       const isLandmarkSuggestion = (entry: (typeof selectedEntries)[number]) =>
         !!entry.ai_suggestion && entry.kind !== "restaurant";
@@ -262,6 +278,17 @@ function InboxTriage({ entries }: { entries: Entry[] }) {
     if (!selectedEntries.length || busy) return;
     setBusy(true);
     try {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id ?? null;
+      if (!uid) {
+        deleteGuestEntries(selectedEntries.map((entry) => entry.id));
+        setSelected(new Set());
+        toast.success(
+          `${selectedEntries.length} ${selectedEntries.length === 1 ? "memory" : "memories"} discarded.`,
+        );
+        return;
+      }
+
       const { error } = await supabase
         .from("entries")
         .delete()
@@ -433,11 +460,23 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
     setBusy(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
-      if (!uid) return;
+      const uid = auth.user?.id ?? null;
       const finalName = useSuggestion ? (suggestion ?? title) : title;
       const finalKind: Kind =
         useSuggestion && suggestion && entry.kind !== "restaurant" ? "landmark" : kind;
+
+      if (!uid || entry.id.startsWith("guest-")) {
+        updateGuestEntry(entry.id, {
+          title: finalName || null,
+          kind: finalKind,
+          city_id: cityId,
+          status: "confirmed",
+        });
+        await qc.invalidateQueries();
+        onComplete?.();
+        return;
+      }
+
       let landmarkId: string | null = null;
 
       if (finalKind === "landmark" && finalName) {
@@ -473,6 +512,12 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
   }
 
   async function discard() {
+    if (entry.id.startsWith("guest-")) {
+      deleteGuestEntries([entry.id]);
+      await qc.invalidateQueries();
+      onComplete?.();
+      return;
+    }
     await supabase.from("entries").delete().eq("id", entry.id);
     await qc.invalidateQueries();
     onComplete?.();

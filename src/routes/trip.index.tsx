@@ -1,16 +1,18 @@
 import { createFileRoute, ClientOnly, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Lock } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { GhostEntry, ItineraryImporter, SavedIdeas } from "@/components/Planned";
 import type { MapPoint } from "@/components/JourneyMap";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
+import { useTierAccess } from "@/lib/tiers";
 import { fmtRange, useActiveTrip, useCities, useEntries, useTrips } from "@/lib/touri";
 
 const JourneyMap = lazy(() => import("@/components/JourneyMap"));
@@ -43,7 +45,9 @@ function TripPage() {
   const { user } = useSession();
   const qc = useQueryClient();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { trip } = useActiveTrip();
+  const access = useTierAccess(trip?.id);
   const all = useTrips();
   const cities = useCities(trip?.id);
   const entries = useEntries({ tripId: trip?.id, limit: 200 });
@@ -196,9 +200,26 @@ function TripPage() {
       </ol>
 
       <div className="px-6 py-10">
-        <Link to="/trips/new" className="text-xs uppercase tracking-[0.18em] text-accent">
-          + Start another trip
-        </Link>
+        {access.canCreateTrip ? (
+          <Link to="/trips/new" className="text-xs uppercase tracking-[0.18em] text-accent">
+            + Start another trip
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setUpgradeOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-accent"
+          >
+            + Start another trip <Lock className="size-3" />
+          </button>
+        )}
+        <UpgradeDialog
+          open={upgradeOpen}
+          onOpenChange={setUpgradeOpen}
+          tripId={trip.id}
+          tripTitle={trip.title}
+          reason="Free Explorer includes 1 active trip. Unlock Touri Pro ($29/yr) to keep an unlimited travel archive across every journey."
+        />
         {archiveTrips.length > 0 && (
           <section className="mt-12">
             <h2 className="eyebrow">Travel Archive</h2>

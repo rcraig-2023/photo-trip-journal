@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
+import { deleteGuestEntries, updateGuestEntry } from "@/lib/guestStore";
 import { KIND_LABEL, fmtTime, useEntry, type Kind } from "@/lib/touri";
 
 export const Route = createFileRoute("/entry/$entryId")({
@@ -47,6 +48,16 @@ function EntryPage() {
   const e = entry.data;
 
   async function save() {
+    if (entryId.startsWith("guest-")) {
+      updateGuestEntry(entryId, {
+        title: title || null,
+        place_name: place || null,
+        body: body || null,
+      });
+      toast.success("Saved");
+      qc.invalidateQueries();
+      return;
+    }
     const { error } = await supabase
       .from("entries")
       .update({ title: title || null, place_name: place || null, body: body || null })
@@ -59,6 +70,12 @@ function EntryPage() {
   }
 
   async function revertToPlanned() {
+    if (entryId.startsWith("guest-")) {
+      updateGuestEntry(entryId, { status: "planned" });
+      toast.success("Back to planned.");
+      qc.invalidateQueries();
+      return;
+    }
     // Status only — occurred_at keeps its scheduled date and time.
     const { error } = await supabase.from("entries").update({ status: "planned" }).eq("id", entryId);
     if (error) return void toast.error(error.message);
@@ -67,6 +84,12 @@ function EntryPage() {
   }
 
   async function remove() {
+    if (entryId.startsWith("guest-")) {
+      deleteGuestEntries([entryId]);
+      qc.invalidateQueries();
+      navigate({ to: "/memories" });
+      return;
+    }
     await supabase.from("entries").delete().eq("id", entryId);
     qc.invalidateQueries();
     navigate({ to: "/memories" });

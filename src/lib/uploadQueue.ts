@@ -2,7 +2,14 @@ import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchGoogleRatings, identifyLandmark } from "@/lib/ai.functions";
-import { blobToDataUrl, isHeic, optimizePhoto } from "@/lib/images";
+import { blobToDataUrl, optimizePhoto } from "@/lib/images";
+import {
+  addGuestPhotoEntry,
+  clearGuestState,
+  getGuestBlob,
+  getGuestState,
+} from "@/lib/guestStore";
+import { TIER_LIMITS } from "@/lib/tiers";
 
 export type ItemStatus = "waiting" | "optimizing" | "uploading" | "uploaded" | "duplicate" | "failed";
 export type AiStatus = "waiting" | "running" | "done" | "failed" | "skipped";
@@ -183,6 +190,10 @@ async function attachToPlannedMatch(photoEntryId: string, name: string): Promise
 
 /** Re-run recognition for a single already-uploaded photo. */
 export async function retryRecognition(entryId: string, storagePath: string, hash: string | null) {
+  if (storagePath.startsWith("guest://")) {
+    toast.info("Create a free account to run AI place recognition on your photos.");
+    return;
+  }
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id;
   if (!uid) return;
@@ -193,19 +204,26 @@ export async function retryRecognition(entryId: string, storagePath: string, has
     const dataUrl = await blobToDataUrl(file);
     await runAi(entryId, hash ?? storagePath, uid, dataUrl);
   } catch (err) {
+    const msg = err instanceof Error ? err.message : "Recognition failed";
     await supabase
       .from("entries")
       .update({
         ai_status: "failed",
         ai_processed_at: new Date().toISOString(),
-        ai_error: err instanceof Error ? err.message : "Recognition failed",
+        ai_error: msg,
       })
       .eq("id", entryId);
+    toast.error(msg);
   }
   onChanged?.();
 }
 
-type BatchContext = { userId: string; tripId: string | null; cityId: string | null };
+type BatchContext = {
+  userId: string | null; // null = Guest mode (saved locally in IndexedDB)
+  tripId: string | null;
+  cityId: string | null;
+  maxAiAllowed?: number;
+};
 
 /**
  * Optimize -> dedupe -> upload -> (async) recognise. Keeps running after the
@@ -222,16 +240,10 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
   }));
   set({ running: true, phase: "preparing", items, total: files.length, uploaded: 0, failed: 0 });
 
-  const heicCount = files.filter(isHeic).length;
-  if (heicCount) {
-    toast(
-      `${heicCount} iPhone HEIC photo${heicCount > 1 ? "s" : ""} will be uploaded as-is — your browser can't shrink them.`,
-    );
-  }
-
-  const aiJobs: { entryId: string; hash: string; dataUrl: string }[] = [];
+  const aiJobs: { entryId: string; hash: string; dataUrl: string; itemId: string }[] = [];
   const CONCURRENCY = 3;
   let cursor = 0;
+  let aiBudgetRemaining = ctx.userId ? (ctx.maxAiAllowed ?? TIER_LIMITS.free.maxAiScans) : 0;
 
   async function worker() {
     while (cursor < files.length) {
@@ -242,6 +254,33 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
         patch(item.id, { status: "optimizing" });
         set({ phase: "optimizing" });
         const opt = await optimizePhoto(file);
+        const capturedAt = opt.meta.capturedAt ?? new Date().toISOString();
+
+        // Stage 0: Guest Mode -> Save locally in browser IndexedDB ($0 server storage)
+        if (!ctx.userId) {
+          patch(item.id, { status: "uploading" });
+          set({ phase: "uploading" });
+          const res = await addGuestPhotoEntry({
+            tripId: ctx.tripId,
+            cityId: ctx.cityId,
+            blob: opt.blob,
+            mime: opt.mime,
+            width: opt.width,
+            height: opt.height,
+            hash: opt.hash,
+            capturedAt,
+            lat: opt.meta.lat,
+            lng: opt.meta.lng,
+          });
+          if ("duplicate" in res) {
+            patch(item.id, { status: "duplicate", ai: "skipped" });
+            continue;
+          }
+          patch(item.id, { status: "uploaded", ai: "skipped" });
+          set({ uploaded: state.uploaded + 1 });
+          onChanged?.();
+          continue;
+        }
 
         const { data: dupe } = await supabase
           .from("entry_photos")
@@ -262,6 +301,9 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
           .upload(path, opt.blob, { contentType: opt.mime, upsert: false });
         if (upErr) throw upErr;
 
+        const shouldRunAi = aiBudgetRemaining > 0;
+        if (shouldRunAi) aiBudgetRemaining--;
+
         const { data: entry, error: entryErr } = await supabase
           .from("entries")
           .insert({
@@ -270,8 +312,8 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
             city_id: ctx.cityId,
             kind: "photo",
             status: "pending",
-            ai_status: "processing",
-            occurred_at: opt.meta.capturedAt ?? new Date().toISOString(),
+            ai_status: shouldRunAi ? "processing" : "none",
+            occurred_at: capturedAt,
           })
           .select("id")
           .single();
@@ -291,7 +333,17 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
           lng: opt.meta.lng,
         });
 
-        aiJobs.push({ entryId: entry.id, hash: opt.hash, dataUrl: await blobToDataUrl(opt.blob) });
+        if (shouldRunAi) {
+          aiJobs.push({
+            entryId: entry.id,
+            hash: opt.hash,
+            dataUrl: await blobToDataUrl(opt.blob),
+            itemId: item.id,
+          });
+        } else {
+          patch(item.id, { ai: "skipped" });
+        }
+
         patch(item.id, { status: "uploaded" });
         set({ uploaded: state.uploaded + 1 });
         onChanged?.();
@@ -309,18 +361,16 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
 
   // Recognition runs after upload, two at a time, and never blocks the photos.
   set({ phase: aiJobs.length ? "thinking" : "done" });
-  const uploadedItems = state.items.filter((i) => i.status === "uploaded");
   let aiCursor = 0;
 
   async function aiWorker() {
     while (aiCursor < aiJobs.length) {
       const index = aiCursor++;
       const job = aiJobs[index]!;
-      const item = uploadedItems[index];
-      if (item) patch(item.id, { ai: "running" });
+      patch(job.itemId, { ai: "running" });
       try {
-        await runAi(job.entryId, job.hash, ctx.userId, job.dataUrl);
-        if (item) patch(item.id, { ai: "done" });
+        await runAi(job.entryId, job.hash, ctx.userId!, job.dataUrl);
+        patch(job.itemId, { ai: "done" });
       } catch (err) {
         await supabase
           .from("entries")
@@ -330,13 +380,148 @@ export async function enqueuePhotos(files: File[], ctx: BatchContext) {
             ai_error: err instanceof Error ? err.message : "Recognition failed",
           })
           .eq("id", job.entryId);
-        if (item) patch(item.id, { ai: "failed" });
+        patch(job.itemId, { ai: "failed" });
       }
       onChanged?.();
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(2, aiJobs.length) }, aiWorker));
+  if (ctx.userId && aiJobs.length) {
+    await Promise.all(Array.from({ length: Math.min(2, aiJobs.length) }, aiWorker));
+  }
   set({ running: false, phase: "done" });
   onChanged?.();
+}
+
+/**
+ * Automatically flushes any Guest local trip, city, entries, and IndexedDB photo blobs
+ * into the user's permanent Supabase account right after they sign up or sign in.
+ */
+export async function syncGuestToSupabase(userId: string): Promise<number> {
+  const guest = getGuestState();
+  if (!guest.trips.length && !guest.entries.length && !guest.photos.length) {
+    return 0;
+  }
+
+  let syncedEntries = 0;
+  try {
+    const tripIdMap = new Map<string, string>();
+    const cityIdMap = new Map<string, string>();
+
+    for (const gTrip of guest.trips) {
+      const { data: createdTrip } = await supabase
+        .from("trips")
+        .insert({
+          user_id: userId,
+          title: gTrip.title,
+          subtitle: gTrip.subtitle?.includes("Guest preview") ? null : gTrip.subtitle,
+          start_date: gTrip.start_date,
+          end_date: gTrip.end_date,
+          is_active: gTrip.is_active,
+        })
+        .select("id")
+        .single();
+      if (createdTrip) {
+        tripIdMap.set(gTrip.id, createdTrip.id);
+      }
+    }
+
+    for (const gCity of guest.cities) {
+      const mappedTripId = tripIdMap.get(gCity.trip_id);
+      if (!mappedTripId) continue;
+      const { data: createdCity } = await supabase
+        .from("cities")
+        .insert({
+          user_id: userId,
+          trip_id: mappedTripId,
+          name: gCity.name,
+          country: gCity.country,
+          start_date: gCity.start_date,
+          end_date: gCity.end_date,
+          sort_order: gCity.sort_order,
+          lat: gCity.lat,
+          lng: gCity.lng,
+        })
+        .select("id")
+        .single();
+      if (createdCity) {
+        cityIdMap.set(gCity.id, createdCity.id);
+      }
+    }
+
+    let aiRemaining: number = TIER_LIMITS.free.maxAiScans;
+
+    for (const gEntry of guest.entries) {
+      const mappedTripId = gEntry.trip_id ? (tripIdMap.get(gEntry.trip_id) ?? null) : null;
+      const mappedCityId = gEntry.city_id ? (cityIdMap.get(gEntry.city_id) ?? null) : null;
+      const attachedPhotos = guest.photos.filter((p) => p.entry_id === gEntry.id);
+      const shouldAi = attachedPhotos.length > 0 && aiRemaining > 0;
+      if (shouldAi) aiRemaining--;
+
+      const { data: createdEntry } = await supabase
+        .from("entries")
+        .insert({
+          user_id: userId,
+          trip_id: mappedTripId,
+          city_id: mappedCityId,
+          kind: gEntry.kind,
+          title: gEntry.title,
+          body: gEntry.body,
+          place_name: gEntry.place_name,
+          occurred_at: gEntry.occurred_at,
+          status: gEntry.status,
+          ai_status: shouldAi ? "processing" : "none",
+          cuisine_type: gEntry.cuisine_type,
+          price_tier: gEntry.price_tier,
+          personal_rating: gEntry.personal_rating,
+          date_unknown: gEntry.date_unknown ?? false,
+        })
+        .select("id")
+        .single();
+
+      if (!createdEntry) continue;
+      syncedEntries++;
+
+      for (const gPhoto of attachedPhotos) {
+        const blob = await getGuestBlob(gPhoto.storage_path);
+        if (!blob) continue;
+        const ext = gPhoto.mime === "image/webp" ? "webp" : "jpg";
+        const cloudPath = `${userId}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("memories")
+          .upload(cloudPath, blob, { contentType: gPhoto.mime, upsert: false });
+        if (upErr) continue;
+
+        await supabase.from("entry_photos").insert({
+          user_id: userId,
+          entry_id: createdEntry.id,
+          storage_path: cloudPath,
+          sha256: gPhoto.sha256,
+          width: gPhoto.width,
+          height: gPhoto.height,
+          bytes: gPhoto.bytes,
+          mime: gPhoto.mime,
+          captured_at: gPhoto.captured_at,
+          lat: gPhoto.lat,
+          lng: gPhoto.lng,
+        });
+
+        if (shouldAi) {
+          const dataUrl = await blobToDataUrl(blob);
+          void runAi(
+            createdEntry.id,
+            gPhoto.sha256 ?? cloudPath,
+            userId,
+            dataUrl,
+          ).catch(() => {});
+        }
+      }
+    }
+
+    await clearGuestState();
+    onChanged?.();
+  } catch (e) {
+    console.error("Failed to sync guest state to Supabase:", e);
+  }
+  return syncedEntries;
 }

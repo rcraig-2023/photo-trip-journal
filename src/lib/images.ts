@@ -128,21 +128,37 @@ async function rawPhoto(file: File): Promise<Optimized> {
 /**
  * Downscale to <= 2000px, re-encode as WebP (JPEG fallback) and fingerprint.
  * Re-drawing through a canvas also drops EXIF and other metadata, so we read
- * what we need from the original first. HEIC/HEIF files (and anything the
- * browser fails to decode) are uploaded raw instead of throwing.
+ * what we need from the original first. HEIC/HEIF files are converted client-side
+ * to JPEG before downscaling so they don't consume raw storage.
  */
 export async function optimizePhoto(file: File): Promise<Optimized> {
-  if (isHeic(file)) return rawPhoto(file);
+  const meta = await readExif(file);
+  let sourceBlob: Blob = file;
+
+  if (isHeic(file)) {
+    try {
+      const { heicTo } = await import("heic-to");
+      sourceBlob = await heicTo({ blob: file, type: "image/jpeg", quality: 0.85 });
+    } catch {
+      try {
+        const { default: heic2any } = await import("heic2any");
+        const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+        const first = Array.isArray(converted) ? converted[0] : converted;
+        if (first) sourceBlob = first;
+      } catch {
+        return rawPhoto(file);
+      }
+    }
+  }
 
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file);
+    bitmap = await createImageBitmap(sourceBlob);
   } catch {
     // Browser can't decode this format — keep the original bytes.
     return rawPhoto(file);
   }
 
-  const meta = await readExif(file);
   const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);

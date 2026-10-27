@@ -1,11 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { CityAutocomplete } from "@/components/CityAutocomplete";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
+import { createGuestTrip } from "@/lib/guestStore";
+import { TIER_LIMITS, useTierAccess } from "@/lib/tiers";
 
 export const Route = createFileRoute("/trips/new")({
   head: () => ({
@@ -45,15 +49,64 @@ function NewTrip() {
   const [end, setEnd] = useState("");
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [busy, setBusy] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
+  const access = useTierAccess();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  function addAnotherCity() {
+    if (!access.isPaid && rows.length >= access.limits.maxCitiesPerTrip) {
+      setUpgradeReason(
+        !access.isAuthenticated
+          ? "Guest preview includes 1 city chapter. Create a free account or unlock a Trip Pass to plan multi-city journeys."
+          : `Free Explorer includes ${TIER_LIMITS.free.maxCitiesPerTrip} city chapter per trip. Unlock a Single Trip Pass ($9) or Touri Pro ($29/yr) to add unlimited cities.`,
+      );
+      setUpgradeOpen(true);
+      return;
+    }
+    setRows([...rows, emptyRow()]);
+  }
+
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!access.canCreateTrip) {
+      setUpgradeReason(
+        !access.isAuthenticated
+          ? "Guest preview includes 1 active trip. Create a free account to save your journal."
+          : `Free Explorer includes ${TIER_LIMITS.free.maxTrips} trip. Unlock Touri Pro ($29/yr) for unlimited trips and archive access.`,
+      );
+      setUpgradeOpen(true);
+      return;
+    }
+
     setBusy(true);
     const { data: auth } = await supabase.auth.getUser();
-    const uid = auth.user?.id;
-    if (!uid) return;
+    const uid = auth.user?.id ?? null;
+
+    const validCities = rows
+      .filter((r) => r.name.trim())
+      .slice(0, access.limits.maxCitiesPerTrip);
+
+    if (!uid) {
+      createGuestTrip({
+        title: title.trim(),
+        start_date: start || null,
+        end_date: end || null,
+        cities: validCities.map((r) => ({
+          name: r.name.trim(),
+          country: r.country.trim() || null,
+          start_date: r.start || null,
+          end_date: r.end || null,
+          lat: r.lat,
+          lng: r.lng,
+        })),
+      });
+      await qc.invalidateQueries();
+      setBusy(false);
+      navigate({ to: "/trip" });
+      return;
+    }
 
     await supabase.from("trips").update({ is_active: false }).eq("user_id", uid);
     const { data: trip, error } = await supabase
@@ -74,19 +127,17 @@ function NewTrip() {
       return;
     }
 
-    const cities = rows
-      .filter((r) => r.name.trim())
-      .map((r, i) => ({
-        user_id: uid,
-        trip_id: trip.id,
-        name: r.name.trim(),
-        country: r.country.trim() || null,
-        start_date: r.start || null,
-        end_date: r.end || null,
-        sort_order: i,
-        lat: r.lat,
-        lng: r.lng,
-      }));
+    const cities = validCities.map((r, i) => ({
+      user_id: uid,
+      trip_id: trip.id,
+      name: r.name.trim(),
+      country: r.country.trim() || null,
+      start_date: r.start || null,
+      end_date: r.end || null,
+      sort_order: i,
+      lat: r.lat,
+      lng: r.lng,
+    }));
     if (cities.length) await supabase.from("cities").insert(cities);
 
     await qc.invalidateQueries();
@@ -131,7 +182,11 @@ function NewTrip() {
           <CityAutocomplete
             value={r.name}
             onChange={(v) =>
-              setRows(rows.map((x, j) => (i === j ? { ...x, name: v, country: "", lat: null, lng: null } : x)))
+              setRows(
+                rows.map((x, j) =>
+                  i === j ? { ...x, name: v, country: "", lat: null, lng: null } : x,
+                ),
+              )
             }
             onPick={(hit) =>
               setRows(
@@ -172,10 +227,13 @@ function NewTrip() {
       ))}
       <button
         type="button"
-        onClick={() => setRows([...rows, emptyRow()])}
-        className="mt-5 text-xs uppercase tracking-[0.18em] text-accent"
+        onClick={addAnotherCity}
+        className="mt-5 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-accent"
       >
         + Another city
+        {!access.isPaid && rows.length >= access.limits.maxCitiesPerTrip && (
+          <Lock className="size-3" />
+        )}
       </button>
 
       <button
@@ -184,6 +242,13 @@ function NewTrip() {
       >
         Begin the journal
       </button>
+
+      <UpgradeDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        tripTitle={title.trim() || null}
+        reason={upgradeReason}
+      />
     </form>
   );
 }

@@ -65,12 +65,21 @@ function Today() {
         <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
           Start a trip, add the cities you'll pass through, then let your camera roll do the rest.
         </p>
-        <Link
-          to="/trips/new"
-          className="mt-8 inline-block bg-primary px-6 py-4 text-xs uppercase tracking-[0.18em] text-primary-foreground"
-        >
-          Start a trip
-        </Link>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            to="/trips/new"
+            className="inline-block bg-primary px-6 py-4 text-xs uppercase tracking-[0.18em] text-primary-foreground"
+          >
+            Start a trip
+          </Link>
+          <Link
+            to="/add/photos"
+            search={{ city: undefined }}
+            className="inline-block border border-rule bg-paper px-6 py-4 text-xs uppercase tracking-[0.18em] text-foreground"
+          >
+            Try with 5 photos →
+          </Link>
+        </div>
       </div>
     );
 

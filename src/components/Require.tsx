@@ -1,16 +1,10 @@
-import { useEffect, type ReactNode } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode } from "react";
 import { useSession } from "@/lib/session";
 
 export function Require({ children }: { children: ReactNode }) {
-  const { user, loading } = useSession();
-  const navigate = useNavigate();
+  const { loading } = useSession();
 
-  useEffect(() => {
-    if (!loading && !user) navigate({ to: "/auth" });
-  }, [loading, user, navigate]);
-
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <span className="eyebrow">Touri</span>

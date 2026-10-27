@@ -2,7 +2,7 @@ import { fetchGoogleRatings } from "@/lib/ai.functions";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, CheckCircle, Loader2, MoreVertical } from "lucide-react";
+import { Camera, CheckCircle, Loader2, Lock, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +19,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { parseItinerary } from "@/lib/ai.functions";
 import { confirmPlannedWithPhoto } from "@/lib/planned";
+import { useTierAccess } from "@/lib/tiers";
 import { KIND_LABEL, PRICE_LABEL, fmtTime, type City, type Entry, type Trip } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
@@ -342,7 +344,9 @@ export function SavedIdeas({ entries }: { entries: Entry[] }) {
 export function ItineraryImporter({ trip, cities }: { trip: Trip; cities: City[] }) {
   const qc = useQueryClient();
   const parse = useServerFn(parseItinerary);
+  const access = useTierAccess(trip.id);
   const [open, setOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -410,11 +414,25 @@ export function ItineraryImporter({ trip, cities }: { trip: Trip; cities: City[]
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="mt-4 text-xs uppercase tracking-[0.18em] text-accent"
+        onClick={() => {
+          if (!access.canUseItineraryImport) {
+            setUpgradeOpen(true);
+            return;
+          }
+          setOpen(true);
+        }}
+        className="mt-4 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-accent"
       >
         Paste itinerary
+        {!access.canUseItineraryImport && <Lock className="size-3" />}
       </button>
+      <UpgradeDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        tripId={trip.id}
+        tripTitle={trip.title}
+        reason="AI Itinerary Import turns messy notes or emails into scheduled timeline plans. Unlock a Single Trip Pass ($9) or Touri Pro ($29/yr) to import itineraries."
+      />
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent className="bg-paper">
           <DialogHeader>

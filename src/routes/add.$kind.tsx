@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
+import { addGuestEntry } from "@/lib/guestStore";
 import { useActiveTrip, useCities, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
@@ -80,10 +81,35 @@ function AddEntry() {
 
   async function save() {
     const { data: auth } = await supabase.auth.getUser();
-    const uid = auth.user?.id;
-    if (!uid) return;
+    const uid = auth.user?.id ?? null;
     setBusy(true);
     const occurred = when ? new Date(when) : new Date();
+    const occurredIso = (isNaN(occurred.getTime()) ? new Date() : occurred).toISOString();
+
+    if (!uid) {
+      addGuestEntry({
+        trip_id: trip?.id ?? null,
+        city_id: chosenCity,
+        kind: k,
+        title: title.trim() || null,
+        body: body.trim() || null,
+        status: "confirmed",
+        occurred_at: occurredIso,
+        ...(k === "restaurant"
+          ? {
+              cuisine_type: cuisine.trim() || null,
+              price_tier: priceTier,
+              personal_rating: rated ? rating : null,
+            }
+          : {}),
+      });
+      setBusy(false);
+      await qc.invalidateQueries();
+      if (chosenCity) navigate({ to: "/city/$cityId", params: { cityId: chosenCity } });
+      else navigate({ to: "/" });
+      return;
+    }
+
     const { data: saved, error } = await supabase.from("entries").insert({
       user_id: uid,
       trip_id: trip?.id ?? null,
@@ -92,7 +118,7 @@ function AddEntry() {
       title: title.trim() || null,
       body: body.trim() || null,
       status: "confirmed",
-      occurred_at: (isNaN(occurred.getTime()) ? new Date() : occurred).toISOString(),
+      occurred_at: occurredIso,
       ...(k === "restaurant"
         ? {
             cuisine_type: cuisine.trim() || null,

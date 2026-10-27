@@ -1,12 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Printer, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Printer, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useGuestState } from "@/lib/guestStore";
+import { useSession } from "@/lib/session";
+import { useTierAccess } from "@/lib/tiers";
 import { cn } from "@/lib/utils";
 import { albumDensity, type AlbumMode, type AlbumDensity } from "@/lib/album";
 import {
@@ -46,8 +50,13 @@ export const Route = createFileRoute("/trip/$tripId/export")({
 
 function ExportPage() {
   const { tripId } = Route.useParams();
+  const { user, loading: authLoading } = useSession();
+  const guest = useGuestState();
+  const isGuestTrip = !user || tripId.startsWith("guest-");
+
   const tripQ = useQuery({
     queryKey: ["export-trip", tripId],
+    enabled: !authLoading && !isGuestTrip,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("trips")
@@ -61,6 +70,7 @@ function ExportPage() {
 
   const citiesQ = useQuery({
     queryKey: ["export-cities", tripId],
+    enabled: !authLoading && !isGuestTrip,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cities")
@@ -75,6 +85,7 @@ function ExportPage() {
 
   const entriesQ = useQuery({
     queryKey: ["export-entries", tripId],
+    enabled: !authLoading && !isGuestTrip,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entries")
@@ -87,14 +98,14 @@ function ExportPage() {
     },
   });
 
-  if (tripQ.isLoading || citiesQ.isLoading || entriesQ.isLoading) {
+  if (authLoading || (!isGuestTrip && (tripQ.isLoading || citiesQ.isLoading || entriesQ.isLoading))) {
     return (
       <div className="mx-auto min-h-screen max-w-5xl px-6 py-24">
         <p className="eyebrow">Preparing your album…</p>
       </div>
     );
   }
-  if (tripQ.isError || citiesQ.isError || entriesQ.isError) {
+  if (!isGuestTrip && (tripQ.isError || citiesQ.isError || entriesQ.isError)) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-24">
         <h1 className="display text-4xl">Album couldn’t load</h1>
@@ -112,7 +123,21 @@ function ExportPage() {
       </div>
     );
   }
-  if (!tripQ.data) {
+
+  const resolvedTrip = isGuestTrip
+    ? (guest.trips.find((t) => t.id === tripId) ?? guest.trips[0] ?? null)
+    : (tripQ.data ?? null);
+  const resolvedCities = isGuestTrip
+    ? guest.cities.filter((c) => c.trip_id === resolvedTrip?.id)
+    : (citiesQ.data ?? []);
+  const resolvedEntries = isGuestTrip
+    ? guest.entries
+        .filter((e) => e.trip_id === resolvedTrip?.id && e.status === "confirmed")
+        .slice()
+        .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
+    : (entriesQ.data ?? []);
+
+  if (!resolvedTrip) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-24">
         <h1 className="display text-4xl">Trip not found</h1>
@@ -125,9 +150,9 @@ function ExportPage() {
   return (
     <Album
       key={tripId}
-      trip={tripQ.data}
-      cities={citiesQ.data ?? []}
-      entries={entriesQ.data ?? []}
+      trip={resolvedTrip}
+      cities={resolvedCities}
+      entries={resolvedEntries}
     />
   );
 }
@@ -150,6 +175,10 @@ export function Album({
 }) {
   const [mode, setMode] = useState<AlbumMode>("auto");
   const [photos, setPhotos] = useState<Record<string, "ready" | "error">>({});
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
+  const access = useTierAccess(trip.id);
+
   const settle = useCallback((id: string, status: "ready" | "error") => {
     setPhotos((previous) =>
       previous[id] === status ? previous : { ...previous, [id]: status },
@@ -184,7 +213,15 @@ export function Album({
   ]
     .filter(Boolean)
     .join(" · ");
+
   async function shareAlbum() {
+    if (!access.canExportAlbum) {
+      setUpgradeReason(
+        "Digital Album Sharing is included with a Single Trip Pass ($9) or Touri Pro ($29/yr). Unlock this trip to share your finished editorial journal with friends and family.",
+      );
+      setUpgradeOpen(true);
+      return;
+    }
     const url = window.location.href;
     try {
       if (typeof navigator.share === "function") {
@@ -202,6 +239,18 @@ export function Album({
       toast.error("Couldn’t share the album — copy the address from your browser.");
     }
   }
+
+  function printAlbum() {
+    if (!access.canExportAlbum) {
+      setUpgradeReason(
+        "Print-ready Editorial PDF Export is included with a Single Trip Pass ($9) or Touri Pro ($29/yr). Unlock this trip to download or print your high-resolution keepsake.",
+      );
+      setUpgradeOpen(true);
+      return;
+    }
+    window.print();
+  }
+
   return (
     <div className={cn("album mx-auto min-h-screen max-w-5xl bg-paper", `album-${density}`)}>
       <div className="album-toolbar sticky top-0 z-20 border-b border-rule bg-paper/95 backdrop-blur print:hidden">
@@ -237,21 +286,26 @@ export function Album({
               onClick={shareAlbum}
               className="rounded-none shadow-none"
             >
-              <Share2 /> Share Digital Album
+              {access.canExportAlbum ? <Share2 /> : <Lock className="size-3.5" />} Share Digital
+              Album
             </Button>
             <Button
               size="sm"
               disabled={!printReady}
-              onClick={() => window.print()}
+              onClick={printAlbum}
               className="h-auto min-h-8 max-w-full whitespace-normal rounded-none shadow-none"
             >
-              {printReady ? (
+              {!printReady ? (
+                <Loader2 className="animate-spin motion-reduce:animate-none" />
+              ) : access.canExportAlbum ? (
                 <Printer />
               ) : (
-                <Loader2 className="animate-spin motion-reduce:animate-none" />
+                <Lock className="size-3.5" />
               )}
               {printReady
-                ? "Download / Print PDF"
+                ? access.canExportAlbum
+                  ? "Download / Print PDF"
+                  : "Unlock PDF Export ($9)"
                 : `Preparing album photos (${readyCount}/${photoIds.length})…`}
             </Button>
           </div>
@@ -263,7 +317,18 @@ export function Album({
           )}
         </div>
       </div>
-      <main className="album-content px-5 sm:px-8">
+
+      {/* Print-media lock banner if a Free user invokes Cmd+P directly from the browser */}
+      {!access.canExportAlbum && (
+        <div className="hidden border-b border-rule py-12 text-center print:block">
+          <p className="eyebrow">Touri · Editorial Trip Album Preview</p>
+          <h2 className="display mt-3 text-3xl">
+            Unlock a Single Trip Pass ($9) or Touri Pro to print or export this PDF album.
+          </h2>
+        </div>
+      )}
+
+      <main className={cn("album-content px-5 sm:px-8", !access.canExportAlbum && "print:hidden")}>
         <header className="album-masthead break-inside-avoid border-b border-rule pb-7 pt-10">
           <div className="flex items-center justify-between gap-4">
             <span className="eyebrow">Touri · Travel journal</span>
@@ -309,6 +374,13 @@ export function Album({
           </span>
         </footer>
       </main>
+      <UpgradeDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        tripId={trip.id}
+        tripTitle={trip.title}
+        reason={upgradeReason}
+      />
     </div>
   );
 }

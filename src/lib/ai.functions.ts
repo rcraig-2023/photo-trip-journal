@@ -1,8 +1,41 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import { TIER_LIMITS } from "@/lib/tiers";
 import { z } from "zod";
 
 const MODEL = "google/gemini-3.8-flash";
+
+async function getUserAccessState(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  claims?: Record<string, unknown>,
+): Promise<{ isPaid: boolean; unlockedTripIds: string[] }> {
+  const userMeta = (claims?.["user_metadata"] as Record<string, unknown> | undefined) ?? {};
+  const metaTier = userMeta["tier"] as string | undefined;
+  const metaUnlocked = Array.isArray(userMeta["unlocked_trip_ids"])
+    ? (userMeta["unlocked_trip_ids"] as string[])
+    : [];
+
+  if (metaTier === "pro") {
+    return { isPaid: true, unlockedTripIds: metaUnlocked };
+  }
+
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    const row = profile as { tier?: string | null; unlocked_trip_ids?: string[] | null } | null;
+    const unlocked = Array.from(new Set([...metaUnlocked, ...(row?.unlocked_trip_ids ?? [])]));
+    const isPaid = row?.tier === "pro" || unlocked.length > 0;
+    return { isPaid, unlockedTripIds: unlocked };
+  } catch {
+    return { isPaid: metaUnlocked.length > 0, unlockedTripIds: metaUnlocked };
+  }
+}
 
 async function askGemini(body: unknown) {
   const key = process.env["LOVABLE_API_KEY"];
@@ -40,7 +73,24 @@ const IdentifyInput = z.object({ imageDataUrl: z.string().min(32).max(6_000_000)
 export const identifyLandmark = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => IdentifyInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const access = await getUserAccessState(
+      context.supabase,
+      context.userId,
+      context.claims as Record<string, unknown>,
+    );
+    if (!access.isPaid) {
+      const { count } = await context.supabase
+        .from("ai_image_results")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", context.userId);
+      if ((count ?? 0) >= TIER_LIMITS.free.maxAiScans) {
+        throw new Error(
+          `Free accounts include ${TIER_LIMITS.free.maxAiScans} AI place recognitions. Unlock a Trip Pass or Touri Pro for unlimited recognition.`,
+        );
+      }
+    }
+
     const raw = await askGemini({
       model: MODEL,
       messages: [
@@ -93,7 +143,25 @@ const EnrichInput = z.object({
 export const enrichLandmark = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => EnrichInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const access = await getUserAccessState(
+      context.supabase,
+      context.userId,
+      context.claims as Record<string, unknown>,
+    );
+    if (!access.isPaid) {
+      const { count } = await context.supabase
+        .from("landmarks")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", context.userId)
+        .not("enriched_at", "is", null);
+      if ((count ?? 0) >= TIER_LIMITS.free.maxAiScans) {
+        throw new Error(
+          "Free landmark notes limit reached. Unlock a Trip Pass or Touri Pro for unlimited notes.",
+        );
+      }
+    }
+
     const raw = await askGemini({
       model: MODEL,
       messages: [
@@ -147,7 +215,18 @@ export type ItineraryItem = {
 export const parseItinerary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => ItineraryInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const access = await getUserAccessState(
+      context.supabase,
+      context.userId,
+      context.claims as Record<string, unknown>,
+    );
+    if (!access.isPaid) {
+      throw new Error(
+        "AI Itinerary Import is a Trip Pass / Touri Pro feature. Upgrade to turn pasted notes into a timeline.",
+      );
+    }
+
     const raw = await askGemini({
       model: MODEL,
       messages: [
@@ -222,7 +301,7 @@ const RatingsInput = z.object({ entryIds: z.array(z.string().uuid()).min(1).max(
 
 /**
  * Looks up Google rating + review count for restaurant entries and saves them.
- * Never throws for a single failed lookup — ratings are a nice-to-have.
+ * Reuses cached ratings first and enforces Free tier lookup limits.
  */
 export const fetchGoogleRatings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -230,6 +309,25 @@ export const fetchGoogleRatings = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const key = process.env["GOOGLE_PLACES_API_KEY"];
     if (!key) return { updated: 0, skipped: "missing_key" as const };
+
+    const access = await getUserAccessState(
+      context.supabase,
+      context.userId,
+      context.claims as Record<string, unknown>,
+    );
+
+    let usedLookups = 0;
+    if (!access.isPaid) {
+      const { count } = await context.supabase
+        .from("entries")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", context.userId)
+        .not("google_rating", "is", null);
+      usedLookups = count ?? 0;
+      if (usedLookups >= TIER_LIMITS.free.maxGoogleLookups) {
+        return { updated: 0, skipped: "quota_exceeded" as const };
+      }
+    }
 
     const { data: rows, error } = await context.supabase
       .from("entries")
@@ -240,16 +338,44 @@ export const fetchGoogleRatings = createServerFn({ method: "POST" })
 
     let updated = 0;
     for (const row of rows ?? []) {
+      if (!access.isPaid && usedLookups >= TIER_LIMITS.free.maxGoogleLookups) {
+        break;
+      }
+
       const r = row as unknown as {
         id: string;
         title: string | null;
         place_name: string | null;
         cities: { name: string; country: string | null } | null;
       };
+      if (!r.title) continue;
+
+      // 1. Check existing cached ratings in the user's entries first ($0 API cost)
+      const { data: cached } = await context.supabase
+        .from("entries")
+        .select("google_rating, google_review_count")
+        .ilike("title", r.title)
+        .not("google_rating", "is", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (cached?.google_rating != null) {
+        const { error: cacheUpErr } = await context.supabase
+          .from("entries")
+          .update({
+            google_rating: cached.google_rating,
+            google_review_count: cached.google_review_count ?? 0,
+          })
+          .eq("id", r.id);
+        if (!cacheUpErr) updated++;
+        continue;
+      }
+
       const query = [r.title, r.place_name, r.cities?.name, r.cities?.country]
         .filter(Boolean)
         .join(", ");
-      if (!r.title || !query) continue;
+      if (!query) continue;
+
       try {
         const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
           method: "POST",
@@ -276,7 +402,10 @@ export const fetchGoogleRatings = createServerFn({ method: "POST" })
             google_review_count: place.userRatingCount ?? 0,
           })
           .eq("id", r.id);
-        if (!upErr) updated++;
+        if (!upErr) {
+          updated++;
+          usedLookups++;
+        }
       } catch (e) {
         console.error("Places lookup error", e);
       }

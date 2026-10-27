@@ -1,7 +1,9 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Camera, MapPin, PenLine, Plus, UtensilsCrossed, X } from "lucide-react";
-import { usePendingCount } from "@/lib/touri";
+import { Camera, MapPin, PenLine, Plus, Sparkles, UtensilsCrossed, X } from "lucide-react";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
+import { useActiveTrip, usePendingCount } from "@/lib/touri";
+import { TIER_LIMITS, useTierAccess } from "@/lib/tiers";
 import { useUploadQueue } from "@/lib/uploadQueue";
 import { cn } from "@/lib/utils";
 
@@ -21,16 +23,57 @@ const QUEUE_COPY: Record<string, string> = {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const navigate = useNavigate();
   const pending = usePendingCount();
   const queue = useUploadQueue();
+  const { trip } = useActiveTrip();
+  const access = useTierAccess(trip?.id);
   const pathname = useLocation({ select: (l) => l.pathname });
   const currentCity = pathname.match(/^\/city\/([^/]+)/)?.[1];
 
-
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col bg-background">
+      {/* Stage 0 (Guest) or Stage 1 (Free Explorer) Sticky Status Bar */}
+      {!access.isAuthenticated ? (
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-rule bg-paper/95 px-5 py-2.5 text-xs backdrop-blur print:hidden">
+          <span className="truncate text-muted-foreground">
+            <span className="font-medium text-foreground">Guest preview</span> · {access.photosUsed}/
+            {TIER_LIMITS.guest.maxPhotos} local photos
+          </span>
+          <Link
+            to="/auth"
+            className="shrink-0 text-[0.68rem] font-medium uppercase tracking-[0.14em] text-accent underline underline-offset-4"
+          >
+            Sign up free to save →
+          </Link>
+        </div>
+      ) : (
+        !access.isPaid && (
+          <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-rule bg-paper/95 px-5 py-2 text-xs backdrop-blur print:hidden">
+            <span className="truncate text-muted-foreground">
+              <span className="font-medium text-foreground">Free Explorer</span> · {access.photosUsed}/
+              {TIER_LIMITS.free.maxPhotos} photos · {access.aiScansUsed}/{TIER_LIMITS.free.maxAiScans} AI scans
+            </span>
+            <button
+              type="button"
+              onClick={() => setUpgradeOpen(true)}
+              className="inline-flex shrink-0 items-center gap-1 text-[0.68rem] font-medium uppercase tracking-[0.14em] text-accent"
+            >
+              <Sparkles className="size-3" /> Unlock Trip Pass →
+            </button>
+          </div>
+        )
+      )}
+
       <main className="flex-1 pb-28">{children}</main>
+
+      <UpgradeDialog
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        tripId={trip?.id}
+        tripTitle={trip?.title}
+      />
 
       {open && (
         <div
@@ -87,7 +130,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-2xl border-t border-rule bg-paper/95 backdrop-blur safe-bottom">
-
         <div className="grid grid-cols-5 items-center px-2 pt-2">
           <NavItem to="/" label="Today" />
           <NavItem to="/trip" label="Trip" />
