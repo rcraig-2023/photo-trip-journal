@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "test": "tsx -e \"import { runAllVerificationSuites } from './src/lib/tiers.test'; runAllVerificationSuites().then(() => console.log('All verification suites passed!'))\"",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

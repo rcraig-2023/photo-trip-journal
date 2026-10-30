@@ -1,48 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
-import { isCreatorEmail, TIER_LIMITS } from "@/lib/tiers";
+import {
+  dedupeItinerary,
+  getUserAccessState,
+  TIER_LIMITS,
+  type ItineraryItem,
+} from "@/lib/tiers";
 import { z } from "zod";
 
+export { dedupeItinerary, getUserAccessState, type ItineraryItem };
+
 const MODEL = "google/gemini-3.8-flash";
-
-async function getUserAccessState(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  claims?: Record<string, unknown>,
-): Promise<{ isPaid: boolean; unlockedTripIds: string[] }> {
-  const email = (claims?.["email"] as string | undefined) ?? null;
-  const userMeta = (claims?.["user_metadata"] as Record<string, unknown> | undefined) ?? {};
-  const metaTier = userMeta["tier"] as string | undefined;
-  const metaUnlocked = Array.isArray(userMeta["unlocked_trip_ids"])
-    ? (userMeta["unlocked_trip_ids"] as string[])
-    : [];
-
-  if (metaTier === "pro" || metaTier === "trip_pass") {
-    return { isPaid: true, unlockedTripIds: metaUnlocked };
-  }
-  if (metaTier === "free" || metaTier === "guest") {
-    return { isPaid: false, unlockedTripIds: [] };
-  }
-  if (isCreatorEmail(email)) {
-    return { isPaid: true, unlockedTripIds: metaUnlocked };
-  }
-
-  try {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-    const row = profile as { tier?: string | null; unlocked_trip_ids?: string[] | null } | null;
-    const unlocked = Array.from(new Set([...metaUnlocked, ...(row?.unlocked_trip_ids ?? [])]));
-    const isPaid = row?.tier === "pro" || unlocked.length > 0;
-    return { isPaid, unlockedTripIds: unlocked };
-  } catch {
-    return { isPaid: metaUnlocked.length > 0, unlockedTripIds: metaUnlocked };
-  }
-}
 
 async function askGemini(body: unknown) {
   const key = process.env["LOVABLE_API_KEY"];
@@ -209,15 +177,6 @@ const ItineraryInput = z.object({
   cities: z.array(z.string().max(120)).max(50),
 });
 
-export type ItineraryItem = {
-  title: string;
-  kind: "landmark" | "restaurant" | "jot";
-  place: string;
-  city: string;
-  note: string;
-  occurred_at: string | null;
-};
-
 /** Turns messy pasted itinerary text into planned entries anchored to the trip dates. */
 export const parseItinerary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -276,33 +235,6 @@ Rules:
 
     return dedupeItinerary(items);
   });
-
-const normTitle = (s: string) =>
-  s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
-
-const TWO_HOURS = 2 * 60 * 60 * 1000;
-
-/**
- * Drops duplicate parsed items: same (or contained) title on the same day
- * within a 2-hour window, or same title when both lack a time. Keeps the
- * first occurrence.
- */
-function dedupeItinerary(items: ItineraryItem[]): ItineraryItem[] {
-  const kept: ItineraryItem[] = [];
-  for (const item of items) {
-    const title = normTitle(item.title);
-    if (!title) continue;
-    const dupe = kept.some((k) => {
-      const kt = normTitle(k.title);
-      if (!(kt === title || kt.includes(title) || title.includes(kt))) return false;
-      if (!item.occurred_at || !k.occurred_at) return true;
-      if (item.occurred_at.slice(0, 10) !== k.occurred_at.slice(0, 10)) return false;
-      return Math.abs(new Date(item.occurred_at).getTime() - new Date(k.occurred_at).getTime()) <= TWO_HOURS;
-    });
-    if (!dupe) kept.push(item);
-  }
-  return kept;
-}
 
 const RatingsInput = z.object({ entryIds: z.array(z.string().uuid()).min(1).max(80) });
 

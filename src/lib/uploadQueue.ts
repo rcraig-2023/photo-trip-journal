@@ -10,7 +10,14 @@ import {
   getGuestBlob,
   getGuestState,
 } from "@/lib/guestStore";
-import { TIER_LIMITS } from "@/lib/tiers";
+import {
+  findBestPlannedMatch,
+  namesMatch,
+  TIER_LIMITS,
+  type PlannedMatchCandidate,
+} from "@/lib/tiers";
+
+export { findBestPlannedMatch, namesMatch, type PlannedMatchCandidate };
 
 export type ItemStatus = "waiting" | "optimizing" | "uploading" | "uploaded" | "duplicate" | "failed";
 export type AiStatus = "waiting" | "running" | "done" | "failed" | "skipped";
@@ -162,18 +169,6 @@ async function runAi(entryId: string, hash: string, userId: string, dataUrl: str
   }
 }
 
-const norm = (s: string | null | undefined) =>
-  (s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
-
-function namesMatch(a: string, b: string) {
-  const x = norm(a);
-  const y = norm(b);
-  if (!x || !y) return false;
-  return x === y || x.includes(y) || y.includes(x);
-}
-
-const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-
 /**
  * Moves the photo onto a planned entry in the same trip whose name matches OR
  * whose scheduled timestamp falls within 3 hours on the same day, confirms it,
@@ -204,41 +199,13 @@ async function attachToPlannedMatch(
     .eq("status", "planned");
   if (!plans?.length) return null;
 
-  // 1. Primary match: AI-recognised place name matches a planned entry's title or place_name
-  let match = name
-    ? plans.find(
-        (p) => namesMatch(p.title ?? "", name) || namesMatch(p.place_name ?? "", name),
-      )
-    : undefined;
-
-  // 2. Secondary match: EXIF timestamp falls within 3 hours of a scheduled plan on the same day
-  if (!match && src.occurred_at) {
-    const srcDay = src.occurred_at.slice(0, 10);
-    const srcTime = new Date(src.occurred_at).getTime();
-    if (!isNaN(srcTime)) {
-      const candidates = plans
-        .filter((p) => {
-          if (p.date_unknown || !p.occurred_at) return false;
-          if (p.occurred_at.slice(0, 10) !== srcDay) return false;
-          if (src.city_id && p.city_id && p.city_id !== src.city_id) return false;
-          if (
-            detectedKind !== "photo" &&
-            (p.kind === "restaurant" || p.kind === "landmark") &&
-            p.kind !== detectedKind
-          ) {
-            return false;
-          }
-          const planTime = new Date(p.occurred_at).getTime();
-          return !isNaN(planTime) && Math.abs(planTime - srcTime) <= THREE_HOURS_MS;
-        })
-        .sort(
-          (a, b) =>
-            Math.abs(new Date(a.occurred_at).getTime() - srcTime) -
-            Math.abs(new Date(b.occurred_at).getTime() - srcTime),
-        );
-      match = candidates[0];
-    }
-  }
+  const match = findBestPlannedMatch({
+    plans: plans as PlannedMatchCandidate[],
+    name,
+    detectedKind,
+    photoOccurredAt: src.occurred_at,
+    photoCityId: src.city_id,
+  });
 
   if (!match) return null;
 

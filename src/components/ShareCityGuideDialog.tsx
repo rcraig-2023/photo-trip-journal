@@ -8,68 +8,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  formatDestinationShareText,
+  shouldSelectForPreset,
+  type SharePreset as Preset,
+} from "@/lib/tiers";
 import { PRICE_LABEL, type Entry } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
-type Preset = "9plus" | "8plus" | "all";
-
-function shouldSelectForPreset(entry: Entry, preset: Preset): boolean {
-  if (preset === "all") return true;
-  const minScore = preset === "9plus" ? 9 : 8;
-  if (entry.personal_rating != null) {
-    return Number(entry.personal_rating) >= minScore;
-  }
-  // Unrated landmarks are included in 8+ by default so sights aren't hidden unless explicitly rated low
-  return preset === "8plus" && entry.kind === "landmark";
-}
-
-export function formatDestinationShareText(opts: {
-  cityName: string;
-  country?: string | null;
-  entries: Entry[];
-}): string {
-  const { cityName, country, entries } = opts;
-  const header = `My ${cityName}${country ? `, ${country}` : ""} Recommendations — via Touri`;
-  const restaurants = entries
-    .filter((e) => e.kind === "restaurant")
-    .sort((a, b) => (b.personal_rating ?? -1) - (a.personal_rating ?? -1));
-  const landmarks = entries
-    .filter((e) => e.kind === "landmark")
-    .sort((a, b) => (b.personal_rating ?? -1) - (a.personal_rating ?? -1));
-
-  const sections: string[] = [header];
-
-  if (restaurants.length) {
-    const lines = restaurants.map((r, i) => {
-      const meta = [
-        r.personal_rating != null ? `${Number(r.personal_rating).toFixed(1)}/10` : null,
-        r.cuisine_type,
-        r.price_tier ? PRICE_LABEL[r.price_tier] : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      const note = r.body ? `\n   “${r.body.trim()}”` : "";
-      return `${i + 1}. ${r.title ?? "Untitled"}${meta ? ` (${meta})` : ""}${note}`;
-    });
-    sections.push(`WHERE TO EAT & DRINK\n${lines.join("\n")}`);
-  }
-
-  if (landmarks.length) {
-    const lines = landmarks.map((l, i) => {
-      const meta = [
-        l.personal_rating != null ? `${Number(l.personal_rating).toFixed(1)}/10` : null,
-        l.place_name && l.place_name !== l.title ? l.place_name : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      const note = l.body ? `\n   “${l.body.trim()}”` : "";
-      return `${i + 1}. ${l.title ?? "Untitled"}${meta ? ` (${meta})` : ""}${note}`;
-    });
-    sections.push(`PLACES & THINGS TO DO\n${lines.join("\n")}`);
-  }
-
-  return sections.join("\n\n");
-}
+export { formatDestinationShareText, shouldSelectForPreset, type Preset };
 
 export function ShareCityGuideDialog({
   open,
@@ -338,3 +285,4 @@ export function ShareCityGuideDialog({
     </Dialog>
   );
 }
+
