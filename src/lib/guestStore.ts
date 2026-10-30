@@ -257,6 +257,35 @@ export function createGuestTrip(input: {
   return trip;
 }
 
+export function addGuestCity(input: {
+  trip_id: string;
+  name: string;
+  country: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  lat: number | null;
+  lng: number | null;
+}): City {
+  const current = getGuestState();
+  const existingCitiesForTrip = current.cities.filter((c) => c.trip_id === input.trip_id);
+  const city: City = {
+    id: `guest-city-${crypto.randomUUID()}`,
+    trip_id: input.trip_id,
+    name: input.name,
+    country: input.country,
+    start_date: input.start_date,
+    end_date: input.end_date,
+    sort_order: existingCitiesForTrip.length,
+    lat: input.lat,
+    lng: input.lng,
+  };
+  saveGuestState({
+    ...current,
+    cities: [...current.cities, city],
+  });
+  return city;
+}
+
 export function addGuestEntry(input: {
   trip_id: string | null;
   city_id: string | null;

@@ -1,5 +1,6 @@
 import { albumDensity } from "./album";
 import {
+  addGuestCity,
   addGuestEntry,
   addGuestPhotoEntry,
   clearGuestState,
@@ -238,6 +239,21 @@ export async function verifyGuestLifecycleAndCleanup() {
     assert(afterTrip.trips.length === 1, "guest trip created");
     assert(afterTrip.cities.length === 1, "guest city created");
     const cityId = afterTrip.cities[0]!.id;
+
+    // Verify adding another city chapter via addGuestCity (used by global '+' Add City dialog)
+    const addedCity = addGuestCity({
+      trip_id: trip.id,
+      name: "New Hope",
+      country: "United States",
+      start_date: "2026-05-12",
+      end_date: "2026-05-12",
+      lat: 40.3643,
+      lng: -74.9513,
+    });
+    assert(
+      addedCity.sort_order === 1 && getGuestState().cities.length === 2,
+      "addGuestCity appends a new city chapter with incremented sort_order",
+    );
 
     // Upload a guest photo blob and verify duplicate hash detection
     const dummyBlob = new Blob(["fake-jpeg-bytes"], { type: "image/jpeg" });

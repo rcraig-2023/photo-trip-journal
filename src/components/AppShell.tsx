@@ -1,6 +1,18 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Camera, MapPin, PenLine, Plus, Sparkles, UtensilsCrossed, X } from "lucide-react";
+import {
+  Camera,
+  Compass,
+  Lock,
+  MapPin,
+  PenLine,
+  Plane,
+  Plus,
+  Sparkles,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
+import { AddCityDialog } from "@/components/AddCityDialog";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { useActiveTrip, usePendingCount } from "@/lib/touri";
 import { TIER_LIMITS, useTierAccess } from "@/lib/tiers";
@@ -23,7 +35,9 @@ const QUEUE_COPY: Record<string, string> = {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [addCityOpen, setAddCityOpen] = useState(false);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
   const navigate = useNavigate();
   const pending = usePendingCount();
   const queue = useUploadQueue();
@@ -70,9 +84,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <UpgradeDialog
         open={upgradeOpen}
-        onOpenChange={setUpgradeOpen}
+        onOpenChange={(next) => {
+          setUpgradeOpen(next);
+          if (!next) setUpgradeReason(null);
+        }}
         tripId={trip?.id}
         tripTitle={trip?.title}
+        reason={upgradeReason}
+      />
+
+      <AddCityDialog
+        open={addCityOpen}
+        onOpenChange={setAddCityOpen}
+        trip={trip}
       />
 
       {open && (
@@ -115,6 +139,70 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </button>
               </li>
             ))}
+
+            {trip && (
+              <li className="hairline">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-4 py-4 text-left"
+                  onClick={() => {
+                    setOpen(false);
+                    if (access.canAddCity) {
+                      setAddCityOpen(true);
+                    } else {
+                      setUpgradeReason(
+                        !access.isAuthenticated
+                          ? "Guest preview includes 1 city chapter. Create a free account or unlock a Trip Pass to plan multi-city journeys."
+                          : `Free Explorer includes ${TIER_LIMITS.free.maxCitiesPerTrip} city chapter per trip. Unlock a Single Trip Pass ($9) or Touri Pro ($29/yr) to add unlimited cities.`,
+                      );
+                      setUpgradeOpen(true);
+                    }
+                  }}
+                >
+                  <Compass className="size-5 text-accent" strokeWidth={1.5} />
+                  <span className="flex-1">
+                    <span className="inline-flex items-center gap-1.5 text-[0.95rem]">
+                      Add City
+                      {!access.canAddCity && <Lock className="size-3.5 text-muted-foreground" />}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Start a new destination chapter in {trip.title}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )}
+
+            <li className="hairline">
+              <button
+                type="button"
+                className="flex w-full items-center gap-4 py-4 text-left"
+                onClick={() => {
+                  setOpen(false);
+                  if (access.canCreateTrip) {
+                    navigate({ to: "/trips/new" });
+                  } else {
+                    setUpgradeReason(
+                      !access.isAuthenticated
+                        ? "Guest preview includes 1 active trip. Create a free account to save your journal."
+                        : `Free Explorer includes ${TIER_LIMITS.free.maxTrips} active trip. Unlock Touri Pro ($29/yr) to keep an unlimited travel archive across every journey.`,
+                    );
+                    setUpgradeOpen(true);
+                  }
+                }}
+              >
+                <Plane className="size-5 text-accent" strokeWidth={1.5} />
+                <span className="flex-1">
+                  <span className="inline-flex items-center gap-1.5 text-[0.95rem]">
+                    New Trip
+                    {!access.canCreateTrip && <Lock className="size-3.5 text-muted-foreground" />}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Start a brand-new journey from anywhere
+                  </span>
+                </span>
+              </button>
+            </li>
           </ul>
           <div className="h-3" />
         </div>
