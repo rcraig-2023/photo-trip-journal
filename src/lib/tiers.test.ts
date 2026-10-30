@@ -5,6 +5,7 @@ import {
   clearGuestState,
   createGuestTrip,
   deleteGuestEntries,
+  deleteGuestTrip,
   getGuestState,
   resolveGuestPhotoUrl,
   updateGuestEntriesStatus,
@@ -301,6 +302,43 @@ export async function verifyGuestLifecycleAndCleanup() {
     assert(
       getGuestState().entries.every((e) => e.id !== restEntry.id),
       "deleted guest entry removed",
+    );
+
+    // Create a second trip (making it active) and verify deleteGuestTrip removes the active trip,
+    // its cities, entries, and photos, while promoting the previous trip back to active
+    const secondTrip = createGuestTrip({
+      title: "Day Trip to New York",
+      start_date: "2026-06-01",
+      end_date: "2026-06-01",
+      cities: [
+        {
+          name: "New York",
+          country: "United States",
+          start_date: "2026-06-01",
+          end_date: "2026-06-01",
+          lat: 40.7128,
+          lng: -74.006,
+        },
+      ],
+    });
+    assert(getGuestState().trips.length === 2, "two trips exist before trip deletion");
+    deleteGuestTrip(secondTrip.id);
+    const afterDeleteSecond = getGuestState();
+    assert(afterDeleteSecond.trips.length === 1, "second trip deleted");
+    assert(
+      afterDeleteSecond.trips[0]?.id === trip.id && afterDeleteSecond.trips[0]?.is_active === true,
+      "remaining trip automatically promoted back to active",
+    );
+
+    // Delete the remaining trip and verify all its cities, entries, and photos are purged
+    deleteGuestTrip(trip.id);
+    const afterDeleteAllTrips = getGuestState();
+    assert(
+      afterDeleteAllTrips.trips.length === 0 &&
+        afterDeleteAllTrips.cities.length === 0 &&
+        afterDeleteAllTrips.entries.length === 0 &&
+        afterDeleteAllTrips.photos.length === 0,
+      "deleteGuestTrip removes trip, cities, entries, and photos completely",
     );
 
     await clearGuestState();

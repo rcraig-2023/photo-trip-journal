@@ -1,15 +1,16 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Lock, Sparkles } from "lucide-react";
+import { Lock, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
+import { DeleteTripDialog } from "@/components/DeleteTripDialog";
 import { Require } from "@/components/Require";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { useSession } from "@/lib/session";
 import { TIER_LIMITS, useTierAccess } from "@/lib/tiers";
-import { useActiveTrip, useTrips } from "@/lib/touri";
+import { useActiveTrip, useTrips, type Trip } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings")({
@@ -36,6 +37,7 @@ function SettingsPage() {
   const trips = useTrips();
   const access = useTierAccess(trip?.id);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<Pick<Trip, "id" | "title"> | null>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -140,18 +142,30 @@ function SettingsPage() {
       <h2 className="eyebrow mt-12">Your trips</h2>
       <ul className="mt-2">
         {trips.data?.map((t) => (
-          <li key={t.id} className="hairline flex items-center justify-between py-4">
-            <span className="display text-xl">{t.title}</span>
-            {t.is_active ? (
-              <span className="eyebrow text-accent">Current</span>
-            ) : (
+          <li key={t.id} className="hairline flex items-center justify-between gap-4 py-4">
+            <span className="display min-w-0 truncate text-xl">{t.title}</span>
+            <div className="flex shrink-0 items-center gap-4">
+              {t.is_active ? (
+                <span className="eyebrow text-accent">Current</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => activate(t.id)}
+                  className="eyebrow underline underline-offset-4"
+                >
+                  Make current
+                </button>
+              )}
               <button
-                onClick={() => activate(t.id)}
-                className="eyebrow underline underline-offset-4"
+                type="button"
+                onClick={() => setTripToDelete({ id: t.id, title: t.title })}
+                aria-label={`Delete ${t.title}`}
+                className="inline-flex items-center gap-1 text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-destructive"
               >
-                Make current
+                <Trash2 className="size-3.5" />
+                <span>Delete</span>
               </button>
-            )}
+            </div>
           </li>
         ))}
       </ul>
@@ -201,6 +215,14 @@ function SettingsPage() {
         onOpenChange={setUpgradeOpen}
         tripId={trip?.id}
         tripTitle={trip?.title}
+      />
+
+      <DeleteTripDialog
+        open={tripToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setTripToDelete(null);
+        }}
+        trip={tripToDelete}
       />
     </div>
   );

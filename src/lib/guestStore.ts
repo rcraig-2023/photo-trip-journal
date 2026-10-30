@@ -411,6 +411,27 @@ export function deleteGuestEntries(entryIds: string[]) {
   });
 }
 
+export function deleteGuestTrip(tripId: string) {
+  const current = getGuestState();
+  const entryIdsToRemove = new Set(
+    current.entries.filter((e) => e.trip_id === tripId).map((e) => e.id),
+  );
+  const remainingTrips = current.trips.filter((t) => t.id !== tripId);
+  const hasActive = remainingTrips.some((t) => t.is_active);
+  const nextTrips =
+    remainingTrips.length > 0 && !hasActive
+      ? remainingTrips.map((t, idx) => (idx === 0 ? { ...t, is_active: true } : t))
+      : remainingTrips;
+
+  saveGuestState({
+    ...current,
+    trips: nextTrips,
+    cities: current.cities.filter((c) => c.trip_id !== tripId),
+    entries: current.entries.filter((e) => e.trip_id !== tripId),
+    photos: current.photos.filter((p) => !entryIdsToRemove.has(p.entry_id)),
+  });
+}
+
 export async function clearGuestState(): Promise<void> {
   cachedState = EMPTY_STATE;
   if (typeof window !== "undefined") {

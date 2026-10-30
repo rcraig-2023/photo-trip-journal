@@ -1,9 +1,10 @@
 import { createFileRoute, ClientOnly, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Lock, Trash2 } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { DeleteTripDialog } from "@/components/DeleteTripDialog";
 import { Button } from "@/components/ui/button";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
@@ -13,7 +14,7 @@ import type { MapPoint } from "@/components/JourneyMap";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/lib/session";
 import { useTierAccess } from "@/lib/tiers";
-import { fmtRange, useActiveTrip, useCities, useEntries, useTrips } from "@/lib/touri";
+import { fmtRange, useActiveTrip, useCities, useEntries, useTrips, type Trip } from "@/lib/touri";
 
 const JourneyMap = lazy(() => import("@/components/JourneyMap"));
 
@@ -46,6 +47,7 @@ function TripPage() {
   const qc = useQueryClient();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<Pick<Trip, "id" | "title"> | null>(null);
   const { trip } = useActiveTrip();
   const access = useTierAccess(trip?.id);
   const all = useTrips();
@@ -147,7 +149,7 @@ function TripPage() {
           {memories.length} memories
         </p>
         <ItineraryImporter trip={trip} cities={cities.data ?? []} />
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
           <Link
             to="/trip/$tripId/export"
             params={{ tripId: trip.id }}
@@ -155,6 +157,14 @@ function TripPage() {
           >
             Download as PDF →
           </Link>
+          <button
+            type="button"
+            onClick={() => setTripToDelete({ id: trip.id, title: trip.title })}
+            className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.16em] text-muted-foreground transition-colors hover:text-destructive"
+          >
+            <Trash2 className="size-3.5" />
+            <span>Delete trip</span>
+          </button>
         </div>
       </header>
 
@@ -228,45 +238,68 @@ function TripPage() {
                 const cover = archiveCovers.data?.get(archiveTrip.id);
                 const isSwitching = switchingId === archiveTrip.id;
                 return (
-                  <Button
+                  <div
                     key={archiveTrip.id}
-                    type="button"
-                    variant="ghost"
-                    disabled={switchingId !== null}
-                    onClick={() => activateTrip(archiveTrip.id)}
-                    className="group h-auto w-[78%] shrink-0 snap-start flex-col items-stretch justify-start gap-0 overflow-hidden rounded-sm border border-rule bg-paper p-0 text-left whitespace-normal transition duration-300 hover:-translate-y-1 hover:bg-paper hover:shadow-lg sm:w-[62%]"
+                    className="relative w-[78%] shrink-0 snap-start sm:w-[62%]"
                   >
-                    {cover ? (
-                      <Photo path={cover} alt={archiveTrip.title} className="aspect-[3/2] w-full" />
-                    ) : (
-                      <div className="flex aspect-[3/2] w-full items-center justify-center bg-muted">
-                        <span className="display text-5xl text-muted-foreground/35">
-                          {archiveTrip.title.slice(0, 1)}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={switchingId !== null}
+                      onClick={() => activateTrip(archiveTrip.id)}
+                      className="group h-auto w-full flex-col items-stretch justify-start gap-0 overflow-hidden rounded-sm border border-rule bg-paper p-0 text-left whitespace-normal transition duration-300 hover:-translate-y-1 hover:bg-paper hover:shadow-lg"
+                    >
+                      {cover ? (
+                        <Photo path={cover} alt={archiveTrip.title} className="aspect-[3/2] w-full" />
+                      ) : (
+                        <div className="flex aspect-[3/2] w-full items-center justify-center bg-muted">
+                          <span className="display text-5xl text-muted-foreground/35">
+                            {archiveTrip.title.slice(0, 1)}
+                          </span>
+                        </div>
+                      )}
+                      <span className="flex w-full items-end justify-between gap-4 px-4 py-4">
+                        <span className="min-w-0">
+                          <span className="display block text-2xl leading-tight text-foreground">
+                            {archiveTrip.title}
+                          </span>
+                          <span className="timecode mt-2 block">
+                            {fmtRange(archiveTrip.start_date, archiveTrip.end_date) || "Dates not set"}
+                          </span>
                         </span>
-                      </div>
-                    )}
-                    <span className="flex w-full items-end justify-between gap-4 px-4 py-4">
-                      <span className="min-w-0">
-                        <span className="display block text-2xl leading-tight text-foreground">
-                          {archiveTrip.title}
-                        </span>
-                        <span className="timecode mt-2 block">
-                          {fmtRange(archiveTrip.start_date, archiveTrip.end_date) || "Dates not set"}
-                        </span>
+                        <ArrowRight
+                          className="mb-1 size-5 shrink-0 text-accent transition-transform duration-300 group-hover:translate-x-1"
+                          strokeWidth={1.5}
+                          aria-hidden="true"
+                        />
                       </span>
-                      <ArrowRight
-                        className="mb-1 size-5 shrink-0 text-accent transition-transform duration-300 group-hover:translate-x-1"
-                        strokeWidth={1.5}
-                        aria-hidden="true"
-                      />
-                    </span>
-                    {isSwitching && <span className="sr-only">Opening trip</span>}
-                  </Button>
+                      {isSwitching && <span className="sr-only">Opening trip</span>}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTripToDelete({ id: archiveTrip.id, title: archiveTrip.title });
+                      }}
+                      aria-label={`Delete ${archiveTrip.title}`}
+                      className="absolute top-2.5 right-2.5 z-10 inline-flex items-center gap-1 rounded-sm border border-rule bg-background/90 px-2.5 py-1.5 text-[0.62rem] uppercase tracking-[0.14em] text-muted-foreground backdrop-blur-sm transition-colors hover:border-destructive/40 hover:text-destructive"
+                    >
+                      <Trash2 className="size-3" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
                 );
               })}
             </div>
           </section>
         )}
+        <DeleteTripDialog
+          open={tripToDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) setTripToDelete(null);
+          }}
+          trip={tripToDelete}
+        />
       </div>
     </div>
   );
