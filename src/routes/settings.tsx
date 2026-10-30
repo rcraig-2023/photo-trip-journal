@@ -97,13 +97,19 @@ function SettingsPage() {
           </div>
         </div>
 
-        {/* Plan Switcher for Testing Tiers Live */}
-        {user && (
+        {/* Creator Tier Switcher (restricted to app creator account) */}
+        {access.isCreator && (
           <div className="mt-5 border-t border-rule pt-4">
-            <span className="eyebrow block text-[0.6rem]">Plan Switcher (Preview)</span>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <span className="eyebrow block text-[0.6rem]">
+              Creator Tier Switcher ({user?.email})
+            </span>
+            <p className="mt-1 text-[0.7rem] text-muted-foreground">
+              Your creator account defaults to Touri Pro ($0). Switch below to test any user stage live:
+            </p>
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {(
                 [
+                  { id: "guest", label: `Guest (${TIER_LIMITS.guest.maxPhotos} local)` },
                   { id: "free", label: `Free (${TIER_LIMITS.free.maxPhotos} photos)` },
                   { id: "trip_pass", label: "Trip Pass ($9)" },
                   { id: "pro", label: "Touri Pro ($29/yr)" },
@@ -114,7 +120,7 @@ function SettingsPage() {
                   type="button"
                   onClick={async () => {
                     await access.updatePlan(option.id, trip?.id);
-                    toast.success(`Switched to ${option.label}`);
+                    toast.success(`Creator view switched to ${option.label}`);
                   }}
                   className={cn(
                     "border px-3 py-1.5 text-[0.68rem] uppercase tracking-[0.12em]",

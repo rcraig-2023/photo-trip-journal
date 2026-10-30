@@ -6,6 +6,14 @@ import { useGuestState } from "@/lib/guestStore";
 
 export type AccessTier = "guest" | "free" | "trip_pass" | "pro";
 
+export const CREATOR_EMAILS = ["ri.craigrica@gmail.com"] as const;
+
+export function isCreatorEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  return CREATOR_EMAILS.some((c) => c.toLowerCase() === normalized);
+}
+
 export const TIER_LIMITS = {
   guest: {
     label: "Guest Preview",
@@ -51,15 +59,21 @@ export const TIER_LIMITS = {
 
 export function resolveEffectiveTier(opts: {
   isAuthenticated: boolean;
+  email?: string | null | undefined;
   profileTier?: string | null | undefined;
   unlockedTripIds?: string[] | null | undefined;
   tripId?: string | null | undefined;
 }): AccessTier {
   if (!opts.isAuthenticated) return "guest";
+  if (opts.profileTier === "guest") return "guest";
   if (opts.profileTier === "pro") return "pro";
   if (opts.tripId && (opts.unlockedTripIds ?? []).includes(opts.tripId)) {
     return "trip_pass";
   }
+  if (opts.profileTier === "free" || opts.profileTier === "trip_pass") {
+    return opts.profileTier === "trip_pass" ? "trip_pass" : "free";
+  }
+  if (isCreatorEmail(opts.email)) return "pro";
   return "free";
 }
 
@@ -99,7 +113,7 @@ const LOCAL_TIER_KEY = "touri_tier_override_v1";
 const tierListeners = new Set<() => void>();
 
 type LocalTierOverride = {
-  tier?: "free" | "pro";
+  tier?: AccessTier;
   unlockedTripIds?: string[];
 };
 
@@ -183,33 +197,41 @@ export function useTierAccess(tripId?: string | null) {
     },
   });
 
+  const isCreator = isCreatorEmail(user?.email);
   const metaTier = (user?.user_metadata?.["tier"] as string | undefined) ?? null;
   const metaUnlocked =
     (user?.user_metadata?.["unlocked_trip_ids"] as string[] | undefined) ?? [];
 
   const effectiveProfileTier =
-    parsedOverride.tier ?? usageQuery.data?.dbTier ?? metaTier ?? "free";
-  const effectiveUnlockedTrips = Array.from(
-    new Set([
-      ...(parsedOverride.unlockedTripIds ?? []),
-      ...(usageQuery.data?.dbUnlockedTrips ?? []),
-      ...metaUnlocked,
-    ]),
-  );
+    parsedOverride.tier ??
+    (isCreator ? (metaTier ?? "pro") : (usageQuery.data?.dbTier ?? metaTier ?? "free"));
+  const effectiveUnlockedTrips =
+    parsedOverride.unlockedTripIds ??
+    Array.from(
+      new Set([
+        ...(usageQuery.data?.dbUnlockedTrips ?? []),
+        ...metaUnlocked,
+      ]),
+    );
 
   const tier = resolveEffectiveTier({
     isAuthenticated: !!user,
+    email: user?.email,
     profileTier: effectiveProfileTier,
     unlockedTripIds: effectiveUnlockedTrips,
     tripId,
   });
 
-  const photosUsed = user ? (usageQuery.data?.photosUsed ?? 0) : guest.photos.length;
-  const aiScansUsed = user ? (usageQuery.data?.aiScansUsed ?? 0) : 0;
-  const tripsUsed = user ? (usageQuery.data?.tripsUsed ?? 0) : guest.trips.length;
-  const citiesInTrip = user
-    ? (citiesQuery.data ?? 0)
-    : guest.cities.filter((c) => !tripId || c.trip_id === tripId).length;
+  const simulatingGuest = tier === "guest";
+  const photosUsed =
+    user && !simulatingGuest ? (usageQuery.data?.photosUsed ?? 0) : guest.photos.length;
+  const aiScansUsed = user && !simulatingGuest ? (usageQuery.data?.aiScansUsed ?? 0) : 0;
+  const tripsUsed =
+    user && !simulatingGuest ? (usageQuery.data?.tripsUsed ?? 0) : guest.trips.length;
+  const citiesInTrip =
+    user && !simulatingGuest
+      ? (citiesQuery.data ?? 0)
+      : guest.cities.filter((c) => !tripId || c.trip_id === tripId).length;
 
   const allowance = computeQuotaAllowance({
     tier,
@@ -220,13 +242,12 @@ export function useTierAccess(tripId?: string | null) {
   });
 
   const updatePlan = useCallback(
-    async (plan: "free" | "trip_pass" | "pro", targetTripId?: string | null) => {
+    async (plan: AccessTier, targetTripId?: string | null) => {
       if (!user) return;
       const unlockId = targetTripId ?? tripId;
-      const nextTier: "free" | "pro" =
-        plan === "pro" ? "pro" : plan === "free" ? "free" : effectiveProfileTier === "pro" ? "pro" : "free";
+      const nextTier: AccessTier = plan;
       const nextUnlocked =
-        plan === "free"
+        plan === "free" || plan === "guest"
           ? []
           : plan === "trip_pass" && unlockId
             ? Array.from(new Set([...effectiveUnlockedTrips, unlockId]))
@@ -236,6 +257,8 @@ export function useTierAccess(tripId?: string | null) {
         tier: nextTier,
         unlockedTripIds: nextUnlocked,
       });
+
+      const dbTierValue = nextTier === "pro" ? "pro" : "free";
 
       try {
         await supabase.auth.updateUser({
@@ -252,7 +275,7 @@ export function useTierAccess(tripId?: string | null) {
         await supabase
           .from("profiles")
           .update({
-            tier: nextTier,
+            tier: dbTierValue,
             unlocked_trip_ids: nextUnlocked,
           })
           .eq("id", user.id);
@@ -262,12 +285,13 @@ export function useTierAccess(tripId?: string | null) {
 
       await qc.invalidateQueries({ queryKey: ["tier-usage"] });
     },
-    [user, tripId, effectiveProfileTier, effectiveUnlockedTrips, qc],
+    [user, tripId, effectiveUnlockedTrips, qc],
   );
 
   return {
     ...allowance,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !simulatingGuest,
+    isCreator,
     unlockedTripIds: effectiveUnlockedTrips,
     isLoading: usageQuery.isLoading,
     updatePlan,

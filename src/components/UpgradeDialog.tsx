@@ -88,13 +88,21 @@ export function UpgradeDialog({
   }
 
   async function handleUnlock() {
+    if (!access.isCreator) {
+      toast.info(
+        selectedPlan === "pro"
+          ? "Touri Pro ($29/yr) checkout is coming soon!"
+          : "Single Trip Pass ($9) checkout is coming soon!",
+      );
+      return;
+    }
     setBusy(true);
     try {
       await access.updatePlan(selectedPlan, tripId);
       toast.success(
         selectedPlan === "pro"
-          ? "Touri Pro unlocked — enjoy unlimited trips, AI recognition & PDF exports."
-          : `Trip Pass unlocked for ${tripTitle ?? "this trip"}!`,
+          ? "Creator Preview: Touri Pro unlocked ($0)"
+          : `Creator Preview: Trip Pass unlocked for ${tripTitle ?? "this trip"} ($0)!`,
       );
       onOpenChange(false);
     } finally {
@@ -217,7 +225,9 @@ export function UpgradeDialog({
                 : "Unlock Single Trip Pass — $9"}
           </button>
           <p className="text-center text-[0.68rem] text-muted-foreground">
-            Instant preview activation enabled · Switch plans anytime in Settings.
+            {access.isCreator
+              ? "Creator account ($0) · Instant tier switching also available in Settings."
+              : "One-time Trip Pass or annual Touri Pro membership · Cancel anytime."}
           </p>
         </div>
       </DialogContent>

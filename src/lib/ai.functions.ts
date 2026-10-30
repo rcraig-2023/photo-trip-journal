@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { TIER_LIMITS } from "@/lib/tiers";
+import { isCreatorEmail, TIER_LIMITS } from "@/lib/tiers";
 import { z } from "zod";
 
 const MODEL = "google/gemini-3.8-flash";
@@ -12,13 +12,20 @@ async function getUserAccessState(
   userId: string,
   claims?: Record<string, unknown>,
 ): Promise<{ isPaid: boolean; unlockedTripIds: string[] }> {
+  const email = (claims?.["email"] as string | undefined) ?? null;
   const userMeta = (claims?.["user_metadata"] as Record<string, unknown> | undefined) ?? {};
   const metaTier = userMeta["tier"] as string | undefined;
   const metaUnlocked = Array.isArray(userMeta["unlocked_trip_ids"])
     ? (userMeta["unlocked_trip_ids"] as string[])
     : [];
 
-  if (metaTier === "pro") {
+  if (metaTier === "pro" || metaTier === "trip_pass") {
+    return { isPaid: true, unlockedTripIds: metaUnlocked };
+  }
+  if (metaTier === "free" || metaTier === "guest") {
+    return { isPaid: false, unlockedTripIds: [] };
+  }
+  if (isCreatorEmail(email)) {
     return { isPaid: true, unlockedTripIds: metaUnlocked };
   }
 

@@ -1,4 +1,9 @@
-import { computeQuotaAllowance, resolveEffectiveTier, TIER_LIMITS } from "./tiers";
+import {
+  computeQuotaAllowance,
+  isCreatorEmail,
+  resolveEffectiveTier,
+  TIER_LIMITS,
+} from "./tiers";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
@@ -6,6 +11,36 @@ function assert(condition: boolean, message: string) {
 
 // Self-contained unit verification (no external test runner dependency required)
 export function verifyTierCalculations() {
+  assert(isCreatorEmail("ri.craigrica@gmail.com") === true, "creator email must be recognized");
+  assert(isCreatorEmail("RI.CRAIGRICA@GMAIL.COM ") === true, "creator email is case-insensitive");
+  assert(isCreatorEmail("visitor@example.com") === false, "non-creator email is false");
+
+  assert(
+    resolveEffectiveTier({
+      isAuthenticated: true,
+      email: "ri.craigrica@gmail.com",
+      profileTier: null,
+    }) === "pro",
+    "creator email defaults to pro when no override is set",
+  );
+
+  assert(
+    resolveEffectiveTier({
+      isAuthenticated: true,
+      email: "ri.craigrica@gmail.com",
+      profileTier: "free",
+    }) === "free",
+    "creator can switch to free to test free limits",
+  );
+
+  assert(
+    resolveEffectiveTier({
+      isAuthenticated: true,
+      email: "ri.craigrica@gmail.com",
+      profileTier: "guest",
+    }) === "guest",
+    "creator can switch to guest to test guest limits",
+  );
   assert(
     resolveEffectiveTier({ isAuthenticated: false, profileTier: "pro" }) === "guest",
     "unauthenticated users must resolve to guest",
