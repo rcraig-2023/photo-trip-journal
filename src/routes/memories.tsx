@@ -34,7 +34,7 @@ import {
   updateGuestEntry,
 } from "@/lib/guestStore";
 import { retryRecognition } from "@/lib/uploadQueue";
-import { fmtTime, useActiveTrip, useCities, useEntries, type Entry, type Kind } from "@/lib/touri";
+import { PRICE_LABEL, fmtTime, useActiveTrip, useCities, useEntries, type Entry, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/memories")({
@@ -439,6 +439,10 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
   const [title, setTitle] = useState(entry.title ?? "");
   const [kind, setKind] = useState<Kind>(entry.kind);
   const [cityId, setCityId] = useState<string | null>(entry.city_id);
+  const [cuisine, setCuisine] = useState(entry.cuisine_type ?? "");
+  const [priceTier, setPriceTier] = useState<number | null>(entry.price_tier);
+  const [rating, setRating] = useState<number>(Number(entry.personal_rating ?? 8.5));
+  const [rated, setRated] = useState<boolean>(entry.personal_rating != null);
   const [busy, setBusy] = useState(false);
   const [rejected, setRejected] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -464,6 +468,18 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
       const finalName = useSuggestion ? (suggestion ?? title) : title;
       const finalKind: Kind =
         useSuggestion && suggestion && entry.kind !== "restaurant" ? "landmark" : kind;
+      const ratingFields =
+        finalKind === "restaurant"
+          ? {
+              cuisine_type: cuisine.trim() || null,
+              price_tier: priceTier,
+              personal_rating: rated ? rating : null,
+            }
+          : finalKind === "landmark"
+            ? {
+                personal_rating: rated ? rating : null,
+              }
+            : {};
 
       if (!uid || entry.id.startsWith("guest-")) {
         updateGuestEntry(entry.id, {
@@ -471,6 +487,7 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
           kind: finalKind,
           city_id: cityId,
           status: "confirmed",
+          ...ratingFields,
         });
         await qc.invalidateQueries();
         onComplete?.();
@@ -500,6 +517,7 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
           status: "confirmed",
           landmark_id: landmarkId,
           place_name: entry.ai_place ?? entry.place_name,
+          ...ratingFields,
         })
         .eq("id", entry.id);
       await qc.invalidateQueries();
@@ -567,6 +585,28 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
               {entry.ai_explanation}
             </p>
           )}
+          <div className="mt-4 border-t border-rule pt-3">
+            <div className="flex items-baseline justify-between">
+              <span className="eyebrow">Rate this experience</span>
+              <span className="display text-xl text-accent">
+                {rated ? rating.toFixed(1) : "—"}
+                <span className="text-xs text-muted-foreground">/10</span>
+              </span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={0.5}
+              value={rating}
+              onChange={(ev) => {
+                setRated(true);
+                setRating(Number(ev.target.value));
+              }}
+              className="mt-2 w-full accent-[var(--color-accent,currentColor)]"
+              aria-label="Rating out of 10"
+            />
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-4 text-xs uppercase tracking-[0.14em]">
             <button
               onClick={() => confirm(true)}
@@ -578,7 +618,7 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
             <button
               onClick={() => {
                 setTitle(suggestion);
-                setKind("landmark");
+                setKind(entry.kind === "restaurant" ? "restaurant" : "landmark");
                 setEditing(true);
               }}
               className="text-muted-foreground"
@@ -636,6 +676,63 @@ function InboxItem({ entry, onComplete }: { entry: Entry; onComplete?: () => voi
               </button>
             ))}
           </div>
+
+          {kind === "restaurant" && (
+            <div className="mt-4 space-y-3 border-t border-rule pt-4">
+              <div>
+                <span className="eyebrow block">Cuisine</span>
+                <input
+                  value={cuisine}
+                  onChange={(e) => setCuisine(e.target.value)}
+                  placeholder="Sicilian, ramen, small plates…"
+                  className="mt-1.5 w-full border-b border-rule bg-transparent pb-1.5 text-sm outline-none placeholder:text-muted-foreground/40"
+                />
+              </div>
+              <div>
+                <span className="eyebrow block">Price</span>
+                <div className="mt-1.5 flex gap-2">
+                  {[1, 2, 3, 4].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPriceTier(priceTier === t ? null : t)}
+                      className={cn(
+                        "border border-rule px-3 py-1 text-xs tracking-[0.08em]",
+                        priceTier === t && "border-accent text-accent",
+                      )}
+                    >
+                      {PRICE_LABEL[t]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(kind === "restaurant" || kind === "landmark") && (
+            <div className="mt-4 border-t border-rule pt-4">
+              <div className="flex items-baseline justify-between">
+                <span className="eyebrow">Your Rating</span>
+                <span className="display text-xl text-accent">
+                  {rated ? rating.toFixed(1) : "—"}
+                  <span className="text-xs text-muted-foreground">/10</span>
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                step={0.5}
+                value={rating}
+                onChange={(e) => {
+                  setRated(true);
+                  setRating(Number(e.target.value));
+                }}
+                className="mt-2 w-full accent-[var(--color-accent,currentColor)]"
+                aria-label="Rating out of 10"
+              />
+            </div>
+          )}
 
           <div className="mt-5 flex items-center gap-4">
             <button

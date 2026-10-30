@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { Share2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { RankedPlaceCard } from "@/components/RankedPlaceCard";
 import { GhostEntry, SavedIdeas } from "@/components/Planned";
+import { ShareCityGuideDialog } from "@/components/ShareCityGuideDialog";
 import { fmtRange, fmtTime, useCity, useEntries, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,20 @@ function CityPage() {
   const city = useCity(cityId);
   const entries = useEntries({ cityId });
   const [filter, setFilter] = useState<Kind | "all">("all");
+  const [shareOpen, setShareOpen] = useState(false);
+
+  const shareableEntries = (entries.data ?? [])
+    .filter(
+      (e) =>
+        e.status === "confirmed" &&
+        (e.kind === "restaurant" || e.kind === "landmark"),
+    )
+    .map((e) => ({
+      ...e,
+      cities: city.data
+        ? { id: city.data.id, name: city.data.name, country: city.data.country }
+        : (e.cities ?? null),
+    }));
 
   const items = (entries.data ?? [])
     .filter((e) => e.status !== "pending" && !(e.status === "planned" && e.date_unknown))
@@ -77,14 +93,32 @@ function CityPage() {
           {city.data?.country ? `${city.data.country} · ` : ""}
           {fmtRange(city.data?.start_date, city.data?.end_date)}
         </p>
-        <Link
-          to="/add/photos"
-          search={{ city: cityId }}
-          className="mt-4 inline-block text-xs uppercase tracking-[0.14em] text-accent"
-        >
-          + Add photos here
-        </Link>
+        <div className="mt-4 flex flex-wrap items-center gap-5">
+          <Link
+            to="/add/photos"
+            search={{ city: cityId }}
+            className="inline-block text-xs uppercase tracking-[0.14em] text-accent"
+          >
+            + Add photos here
+          </Link>
+          {shareableEntries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.14em] text-accent"
+            >
+              <Share2 className="size-3.5" /> Share {city.data?.name ?? "City"} List
+            </button>
+          )}
+        </div>
       </header>
+
+      <ShareCityGuideDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        entries={shareableEntries}
+        initialCityId={cityId}
+      />
 
 
       <SavedIdeas entries={ideas} />

@@ -7,7 +7,8 @@ import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
 import { deleteGuestEntries, updateGuestEntry } from "@/lib/guestStore";
-import { KIND_LABEL, fmtTime, useEntry, type Kind } from "@/lib/touri";
+import { KIND_LABEL, PRICE_LABEL, fmtTime, useEntry, type Kind } from "@/lib/touri";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/entry/$entryId")({
   head: () => ({
@@ -35,32 +36,58 @@ function EntryPage() {
   const [title, setTitle] = useState("");
   const [place, setPlace] = useState("");
   const [body, setBody] = useState("");
+  const [cuisine, setCuisine] = useState("");
+  const [priceTier, setPriceTier] = useState<number | null>(null);
+  const [rating, setRating] = useState<number>(8);
+  const [rated, setRated] = useState<boolean>(false);
 
   useEffect(() => {
     if (entry.data) {
       setTitle(entry.data.title ?? "");
       setPlace(entry.data.place_name ?? "");
       setBody(entry.data.body ?? "");
+      setCuisine(entry.data.cuisine_type ?? "");
+      setPriceTier(entry.data.price_tier ?? null);
+      if (entry.data.personal_rating != null) {
+        setRating(Number(entry.data.personal_rating));
+        setRated(true);
+      } else {
+        setRating(8);
+        setRated(false);
+      }
     }
   }, [entry.data]);
 
   if (!entry.data) return <div className="px-6 py-12 eyebrow">Loading…</div>;
   const e = entry.data;
+  const isRateable = e.kind === "restaurant" || e.kind === "landmark";
 
   async function save() {
+    const patch = {
+      title: title || null,
+      place_name: place || null,
+      body: body || null,
+      ...(e.kind === "restaurant"
+        ? {
+            cuisine_type: cuisine.trim() || null,
+            price_tier: priceTier,
+            personal_rating: rated ? rating : null,
+          }
+        : e.kind === "landmark"
+          ? {
+              personal_rating: rated ? rating : null,
+            }
+          : {}),
+    };
     if (entryId.startsWith("guest-")) {
-      updateGuestEntry(entryId, {
-        title: title || null,
-        place_name: place || null,
-        body: body || null,
-      });
+      updateGuestEntry(entryId, patch);
       toast.success("Saved");
       qc.invalidateQueries();
       return;
     }
     const { error } = await supabase
       .from("entries")
-      .update({ title: title || null, place_name: place || null, body: body || null })
+      .update(patch)
       .eq("id", entryId);
     if (error) toast.error(error.message);
     else {
@@ -124,6 +151,71 @@ function EntryPage() {
           placeholder="Write something down…"
           className="mt-6 w-full resize-none bg-transparent text-[1.05rem] leading-relaxed outline-none"
         />
+
+        {e.kind === "restaurant" && (
+          <div className="mt-6 border-t border-rule pt-6">
+            <h2 className="eyebrow">Cuisine</h2>
+            <input
+              value={cuisine}
+              onChange={(ev) => setCuisine(ev.target.value)}
+              placeholder="Sicilian, ramen, small plates…"
+              className="mt-2 w-full border-b border-rule bg-transparent pb-2 text-sm outline-none placeholder:text-muted-foreground/40"
+            />
+
+            <h2 className="eyebrow mt-6">Price</h2>
+            <div className="mt-2 flex gap-2">
+              {[1, 2, 3, 4].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setPriceTier(priceTier === t ? null : t)}
+                  className={cn(
+                    "border border-rule px-4 py-2 text-sm tracking-[0.08em]",
+                    priceTier === t && "border-accent text-accent",
+                  )}
+                >
+                  {PRICE_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isRateable && (
+          <div className="mt-6 border-t border-rule pt-6">
+            <div className="flex items-baseline justify-between">
+              <h2 className="eyebrow">Your Rating</h2>
+              <div className="flex items-baseline gap-3">
+                {rated && (
+                  <button
+                    type="button"
+                    onClick={() => setRated(false)}
+                    className="text-[0.68rem] uppercase tracking-[0.12em] text-muted-foreground underline"
+                  >
+                    Clear
+                  </button>
+                )}
+                <span className="display text-2xl text-accent">
+                  {rated ? rating.toFixed(1) : "—"}
+                  <span className="text-sm text-muted-foreground">/10</span>
+                </span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={0.5}
+              value={rating}
+              onChange={(ev) => {
+                setRated(true);
+                setRating(Number(ev.target.value));
+              }}
+              className="mt-3 w-full accent-[var(--color-accent,currentColor)]"
+              aria-label="Rating out of 10"
+            />
+          </div>
+        )}
 
         {e.entry_photos && e.entry_photos.length > 1 && (
           <div className="mt-6 grid grid-cols-2 gap-1">

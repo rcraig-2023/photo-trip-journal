@@ -90,6 +90,40 @@ export function useRestaurants() {
   return query;
 }
 
+export function useDirectoryPlaces() {
+  const { user, loading } = useSession();
+  const guest = useGuestState();
+
+  const query = useQuery({
+    queryKey: ["directory-places", user?.id ?? null],
+    enabled: !loading && !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("entries")
+        .select("*, entry_photos(id, storage_path, sha256), cities(id, name, country)")
+        .in("kind", ["restaurant", "landmark"])
+        .in("status", ["confirmed"])
+        .order("occurred_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as Entry[];
+    },
+  });
+
+  if (!loading && !user) {
+    const guestPlaces = guest.entries
+      .filter(
+        (e) =>
+          (e.kind === "restaurant" || e.kind === "landmark") &&
+          e.status === "confirmed",
+      )
+      .slice()
+      .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+    return { ...query, data: guestPlaces, isLoading: false };
+  }
+
+  return query;
+}
+
 export const KIND_LABEL: Record<Kind, string> = {
   photo: "Photos",
   jot: "Jot",

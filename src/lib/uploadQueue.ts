@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchGoogleRatings, identifyLandmark } from "@/lib/ai.functions";
 import { blobToDataUrl, optimizePhoto } from "@/lib/images";
+import { ensureEnrichment, findOrCreateLandmark } from "@/lib/landmarks";
 import {
   addGuestPhotoEntry,
   clearGuestState,
@@ -116,19 +117,45 @@ async function runAi(entryId: string, hash: string, userId: string, dataUrl: str
     })
     .eq("id", entryId);
 
-  // Photo recognised as a restaurant: attach to a matching planned entry if one
-  // exists, otherwise name this entry. Then look up its Google rating.
-  if (result.kind === "restaurant" && result.name) {
-    const target = await attachToPlannedMatch(entryId, result.name);
-    if (!target) {
-      await supabase
-        .from("entries")
-        .update({ kind: "restaurant", title: result.name, place_name: result.place || null })
-        .eq("id", entryId);
+  // Smart Match: attach to a matching planned entry (restaurant or landmark/museum)
+  // by AI-recognised place name or by EXIF timestamp window on the same day.
+  const matchedPlan = await attachToPlannedMatch(entryId, result.name, result.kind);
+  if (matchedPlan) {
+    if (matchedPlan.kind === "restaurant") {
+      try {
+        await fetchGoogleRatings({ data: { entryIds: [matchedPlan.id] } });
+      } catch (e) {
+        console.error("Google rating lookup failed", e);
+      }
+    } else if (matchedPlan.kind === "landmark" && (result.name || matchedPlan.title)) {
+      try {
+        const lm = await findOrCreateLandmark({
+          userId,
+          name: result.name || matchedPlan.title!,
+          placeName: result.place || null,
+          tripId: matchedPlan.trip_id,
+          cityId: matchedPlan.city_id,
+        });
+        await supabase
+          .from("entries")
+          .update({ landmark_id: lm.id })
+          .eq("id", matchedPlan.id);
+        void ensureEnrichment(lm).catch(() => {});
+      } catch {
+        // Ignore enrichment errors
+      }
     }
-    const ratedId = target ?? entryId;
+    return;
+  }
+
+  // Unmatched photo recognised as a restaurant: name this entry and fetch Google rating.
+  if (result.kind === "restaurant" && result.name) {
+    await supabase
+      .from("entries")
+      .update({ kind: "restaurant", title: result.name, place_name: result.place || null })
+      .eq("id", entryId);
     try {
-      await fetchGoogleRatings({ data: { entryIds: [ratedId] } });
+      await fetchGoogleRatings({ data: { entryIds: [entryId] } });
     } catch (e) {
       console.error("Google rating lookup failed", e);
     }
@@ -145,27 +172,74 @@ function namesMatch(a: string, b: string) {
   return x === y || x.includes(y) || y.includes(x);
 }
 
+const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+
 /**
- * Moves the photo onto a planned entry in the same trip whose name matches,
- * confirms it (keeping its trip, city and scheduled time) and removes the
- * temporary photo entry. Returns the planned entry id, or null if no match.
+ * Moves the photo onto a planned entry in the same trip whose name matches OR
+ * whose scheduled timestamp falls within 3 hours on the same day, confirms it,
+ * and removes the temporary photo entry.
  */
-async function attachToPlannedMatch(photoEntryId: string, name: string): Promise<string | null> {
+async function attachToPlannedMatch(
+  photoEntryId: string,
+  name: string,
+  detectedKind: "photo" | "landmark" | "restaurant",
+): Promise<{
+  id: string;
+  kind: "photo" | "landmark" | "restaurant" | "jot";
+  title: string | null;
+  trip_id: string | null;
+  city_id: string | null;
+} | null> {
   const { data: src } = await supabase
     .from("entries")
-    .select("id, trip_id, city_id")
+    .select("id, trip_id, city_id, occurred_at")
     .eq("id", photoEntryId)
     .maybeSingle();
   if (!src?.trip_id) return null;
 
   const { data: plans } = await supabase
     .from("entries")
-    .select("id, title, place_name, city_id, kind")
+    .select("id, title, place_name, city_id, kind, occurred_at, date_unknown")
     .eq("trip_id", src.trip_id)
     .eq("status", "planned");
-  const match = (plans ?? []).find(
-    (p) => namesMatch(p.title ?? "", name) || namesMatch(p.place_name ?? "", name),
-  );
+  if (!plans?.length) return null;
+
+  // 1. Primary match: AI-recognised place name matches a planned entry's title or place_name
+  let match = name
+    ? plans.find(
+        (p) => namesMatch(p.title ?? "", name) || namesMatch(p.place_name ?? "", name),
+      )
+    : undefined;
+
+  // 2. Secondary match: EXIF timestamp falls within 3 hours of a scheduled plan on the same day
+  if (!match && src.occurred_at) {
+    const srcDay = src.occurred_at.slice(0, 10);
+    const srcTime = new Date(src.occurred_at).getTime();
+    if (!isNaN(srcTime)) {
+      const candidates = plans
+        .filter((p) => {
+          if (p.date_unknown || !p.occurred_at) return false;
+          if (p.occurred_at.slice(0, 10) !== srcDay) return false;
+          if (src.city_id && p.city_id && p.city_id !== src.city_id) return false;
+          if (
+            detectedKind !== "photo" &&
+            (p.kind === "restaurant" || p.kind === "landmark") &&
+            p.kind !== detectedKind
+          ) {
+            return false;
+          }
+          const planTime = new Date(p.occurred_at).getTime();
+          return !isNaN(planTime) && Math.abs(planTime - srcTime) <= THREE_HOURS_MS;
+        })
+        .sort(
+          (a, b) =>
+            Math.abs(new Date(a.occurred_at).getTime() - srcTime) -
+            Math.abs(new Date(b.occurred_at).getTime() - srcTime),
+        );
+      match = candidates[0];
+    }
+  }
+
   if (!match) return null;
 
   const { error: moveErr } = await supabase
@@ -174,18 +248,33 @@ async function attachToPlannedMatch(photoEntryId: string, name: string): Promise
     .eq("entry_id", photoEntryId);
   if (moveErr) return null;
 
+  const resolvedKind = (
+    match.kind === "restaurant" || match.kind === "landmark"
+      ? match.kind
+      : detectedKind !== "photo"
+        ? detectedKind
+        : match.kind
+  ) as "photo" | "landmark" | "restaurant" | "jot";
+  const resolvedCityId = match.city_id ?? src.city_id;
+
   await supabase
     .from("entries")
     .update({
       status: "confirmed",
       date_unknown: false,
-      kind: "restaurant",
+      kind: resolvedKind,
       trip_id: src.trip_id,
-      city_id: match.city_id ?? src.city_id,
+      city_id: resolvedCityId,
     })
     .eq("id", match.id);
   await supabase.from("entries").delete().eq("id", photoEntryId);
-  return match.id;
+  return {
+    id: match.id,
+    kind: resolvedKind,
+    title: match.title,
+    trip_id: src.trip_id,
+    city_id: resolvedCityId,
+  };
 }
 
 /** Re-run recognition for a single already-uploaded photo. */

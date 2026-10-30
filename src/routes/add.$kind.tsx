@@ -101,7 +101,11 @@ function AddEntry() {
               price_tier: priceTier,
               personal_rating: rated ? rating : null,
             }
-          : {}),
+          : k === "landmark"
+            ? {
+                personal_rating: rated ? rating : null,
+              }
+            : {}),
       });
       setBusy(false);
       await qc.invalidateQueries();
@@ -125,7 +129,11 @@ function AddEntry() {
             price_tier: priceTier,
             personal_rating: rated ? rating : null,
           }
-        : {}),
+        : k === "landmark"
+          ? {
+              personal_rating: rated ? rating : null,
+            }
+          : {}),
     }).select("id").single();
     setBusy(false);
     if (!error && saved && k === "restaurant")
@@ -202,7 +210,11 @@ function AddEntry() {
               </button>
             ))}
           </div>
+        </>
+      )}
 
+      {(k === "restaurant" || k === "landmark") && (
+        <>
           <div className="mt-8 flex items-baseline justify-between">
             <h2 className="eyebrow">Rating</h2>
             <span className="display text-2xl">
