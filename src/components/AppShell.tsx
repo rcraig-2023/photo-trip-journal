@@ -115,30 +115,44 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
           <ul className="mt-3">
-            {ADD_OPTIONS.map((o) => (
-              <li key={o.kind} className="hairline">
-                <button
-                  className="flex w-full items-center gap-4 py-4 text-left"
-                  onClick={() => {
-                    setOpen(false);
-                    if (o.kind === "photos")
-                      navigate({ to: "/add/photos", search: { city: currentCity } });
-                    else
-                      navigate({
-                        to: "/add/$kind",
-                        params: { kind: o.kind },
-                        search: { city: currentCity },
-                      });
-                  }}
-                >
-                  <o.icon className="size-5 text-accent" strokeWidth={1.5} />
-                  <span className="flex-1">
-                    <span className="block text-[0.95rem]">{o.label}</span>
-                    <span className="block text-xs text-muted-foreground">{o.hint}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
+            {ADD_OPTIONS.map((o) => {
+              const returnTo = currentCity ? `/city/${currentCity}` : undefined;
+              return (
+                <li key={o.kind} className="hairline">
+                  <button
+                    className="flex w-full items-center gap-4 py-4 text-left"
+                    onClick={() => {
+                      setOpen(false);
+                      if (o.kind === "photos")
+                        navigate({
+                          to: "/add/photos",
+                          search: {
+                            city: currentCity,
+                            cityId: currentCity,
+                            returnTo,
+                          },
+                        });
+                      else
+                        navigate({
+                          to: "/add/$kind",
+                          params: { kind: o.kind },
+                          search: {
+                            city: currentCity,
+                            cityId: currentCity,
+                            returnTo,
+                          },
+                        });
+                    }}
+                  >
+                    <o.icon className="size-5 text-accent" strokeWidth={1.5} />
+                    <span className="flex-1">
+                      <span className="block text-[0.95rem]">{o.label}</span>
+                      <span className="block text-xs text-muted-foreground">{o.hint}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
 
             {trip && (
               <li className="hairline">

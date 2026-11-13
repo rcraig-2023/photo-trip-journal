@@ -74,7 +74,7 @@ function Today() {
           </Link>
           <Link
             to="/add/photos"
-            search={{ city: undefined }}
+            search={{ city: undefined, cityId: undefined, returnTo: undefined }}
             className="inline-block border border-rule bg-paper px-6 py-4 text-xs uppercase tracking-[0.18em] text-foreground"
           >
             Try with 5 photos →

@@ -1,5 +1,6 @@
 import { fetchGoogleRatings } from "@/lib/ai.functions";
 import { useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Camera, CheckCircle, Loader2, Lock, MoreVertical } from "lucide-react";
@@ -22,13 +23,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { parseItinerary } from "@/lib/ai.functions";
+import { updateGuestEntry } from "@/lib/guestStore";
 import { confirmPlannedWithPhoto } from "@/lib/planned";
 import { useTierAccess } from "@/lib/tiers";
 import { KIND_LABEL, PRICE_LABEL, fmtTime, type City, type Entry, type Trip } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
-function usePhotoAttach(entryId: string) {
+function usePhotoAttach(entry: Entry) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,9 +47,16 @@ function usePhotoAttach(entryId: string) {
         if (!file) return;
         setBusy(true);
         try {
-          await confirmPlannedWithPhoto(entryId, file);
+          await confirmPlannedWithPhoto(entry.id, file);
           toast.success("Planned place is now a memory.");
           await qc.invalidateQueries();
+          if (entry.city_id) {
+            navigate({
+              to: "/city/$cityId",
+              params: { cityId: entry.city_id },
+              hash: `entry-${entry.id}`,
+            });
+          }
         } catch (err) {
           toast.error(err instanceof Error ? err.message : "Could not add that photo.");
         } finally {
@@ -60,22 +70,38 @@ function usePhotoAttach(entryId: string) {
 
 function useMarkDone(entry: Entry) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+
+  function navigateToTimelineEntry() {
+    if (entry.city_id) {
+      navigate({
+        to: "/city/$cityId",
+        params: { cityId: entry.city_id },
+        hash: `entry-${entry.id}`,
+      });
+    }
+  }
 
   async function markDone() {
     setBusy(true);
     try {
-      const { error } = await supabase
-        .from("entries")
-        // Keep the scheduled occurred_at exactly as planned.
-        .update({ status: "confirmed", date_unknown: false })
-        .eq("id", entry.id);
-      if (error) throw error;
+      if (entry.id.startsWith("guest-")) {
+        updateGuestEntry(entry.id, { status: "confirmed", date_unknown: false });
+      } else {
+        const { error } = await supabase
+          .from("entries")
+          // Keep the scheduled occurred_at exactly as planned.
+          .update({ status: "confirmed", date_unknown: false })
+          .eq("id", entry.id);
+        if (error) throw error;
+      }
       if (entry.kind === "restaurant") setReviewing(true);
       else {
         toast.success("Marked as done.");
         await qc.invalidateQueries();
+        navigateToTimelineEntry();
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not mark this as done.");
@@ -91,6 +117,7 @@ function useMarkDone(entry: Entry) {
       onClose={async () => {
         setReviewing(false);
         await qc.invalidateQueries();
+        navigateToTimelineEntry();
       }}
     />
   );
@@ -266,7 +293,7 @@ function PlanMenu({ entry, size }: { entry: Entry; size: string }) {
 }
 
 function PlanActions({ entry, size = "size-4" }: { entry: Entry; size?: string }) {
-  const photo = usePhotoAttach(entry.id);
+  const photo = usePhotoAttach(entry);
   const done = useMarkDone(entry);
   const busy = photo.busy || done.busy;
   return (
@@ -341,7 +368,17 @@ export function SavedIdeas({ entries }: { entries: Entry[] }) {
   );
 }
 
-export function ItineraryImporter({ trip, cities }: { trip: Trip; cities: City[] }) {
+export function ItineraryImporter({
+  trip,
+  cities,
+  className,
+  label = "Paste itinerary",
+}: {
+  trip: Trip;
+  cities: City[];
+  className?: string | undefined;
+  label?: string | undefined;
+}) {
   const qc = useQueryClient();
   const parse = useServerFn(parseItinerary);
   const access = useTierAccess(trip.id);
@@ -370,13 +407,14 @@ export function ItineraryImporter({ trip, cities }: { trip: Trip; cities: City[]
       const uid = auth.user?.id;
       if (!uid) throw new Error("Please sign in again.");
       const fallback = trip.start_date ? `${trip.start_date}T12:00` : null;
+      const defaultCityId = cities.length === 1 ? cities[0]?.id ?? null : null;
       const rows = items.map((i) => {
         const city = cities.find((c) => c.name.toLowerCase() === i.city.toLowerCase());
         const when = i.occurred_at ?? fallback;
         return {
           user_id: uid,
           trip_id: trip.id,
-          city_id: city?.id ?? null,
+          city_id: city?.id ?? defaultCityId,
           kind: i.kind,
           title: i.title,
           body: i.note || null,
@@ -421,9 +459,12 @@ export function ItineraryImporter({ trip, cities }: { trip: Trip; cities: City[]
           }
           setOpen(true);
         }}
-        className="mt-4 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-accent"
+        className={cn(
+          "mt-4 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-accent",
+          className,
+        )}
       >
-        Paste itinerary
+        {label}
         {!access.canUseItineraryImport && <Lock className="size-3" />}
       </button>
       <UpgradeDialog

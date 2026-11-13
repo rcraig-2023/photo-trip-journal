@@ -1,7 +1,7 @@
-import { createFileRoute, ClientOnly, Link } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Lock, Trash2 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { DeleteTripDialog } from "@/components/DeleteTripDialog";
@@ -19,6 +19,10 @@ import { fmtRange, useActiveTrip, useCities, useEntries, useTrips, type Trip } f
 const JourneyMap = lazy(() => import("@/components/JourneyMap"));
 
 export const Route = createFileRoute("/trip/")({
+  validateSearch: (search: Record<string, unknown>): { overview?: "1" | undefined } =>
+    search["overview"] === "1" || search["overview"] === 1 || search["overview"] === true
+      ? { overview: "1" }
+      : {},
   head: () => ({
     meta: [
       { title: "Trip overview — Touri" },
@@ -44,6 +48,8 @@ export const Route = createFileRoute("/trip/")({
 
 function TripPage() {
   const { user } = useSession();
+  const { overview } = Route.useSearch();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -53,6 +59,18 @@ function TripPage() {
   const all = useTrips();
   const cities = useCities(trip?.id);
   const entries = useEntries({ tripId: trip?.id, limit: 200 });
+  const singleCity = !overview && cities.data?.length === 1 ? cities.data[0] : null;
+
+  useEffect(() => {
+    if (singleCity) {
+      navigate({
+        to: "/city/$cityId",
+        params: { cityId: singleCity.id },
+        replace: true,
+      });
+    }
+  }, [singleCity, navigate]);
+
   const archiveTrips = (all.data ?? []).filter((candidate) => candidate.id !== trip?.id);
   const archiveIds = archiveTrips.map((candidate) => candidate.id);
   const archiveCovers = useQuery({
@@ -114,6 +132,10 @@ function TripPage() {
         </Link>
       </div>
     );
+
+  if (singleCity) {
+    return <div className="px-6 py-12 eyebrow">Opening {singleCity.name}…</div>;
+  }
 
   const all_ = entries.data ?? [];
   const memories = all_.filter((e) => e.status !== "planned");

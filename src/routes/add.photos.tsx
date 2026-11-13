@@ -12,8 +12,16 @@ import { enqueuePhotos, onQueueChange, useUploadQueue } from "@/lib/uploadQueue"
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/add/photos")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    city: typeof search["city"] === "string" ? (search["city"] as string) : undefined,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    city?: string | undefined;
+    cityId?: string | undefined;
+    returnTo?: string | undefined;
+  } => ({
+    ...(typeof search["city"] === "string" ? { city: search["city"] } : {}),
+    ...(typeof search["cityId"] === "string" ? { cityId: search["cityId"] } : {}),
+    ...(typeof search["returnTo"] === "string" ? { returnTo: search["returnTo"] } : {}),
   }),
   head: () => ({
     meta: [
@@ -46,11 +54,16 @@ const PHASE_COPY: Record<string, string> = {
 };
 
 function AddPhotos() {
-  const { city: cityFromContext } = Route.useSearch();
+  const { city: cityParam, cityId: cityIdParam } = Route.useSearch();
+  const cityFromContext = cityIdParam ?? cityParam;
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
   const access = useTierAccess(trip?.id);
   const [cityId, setCityId] = useState<string | null>(cityFromContext ?? null);
+
+  useEffect(() => {
+    if (cityFromContext) setCityId(cityFromContext);
+  }, [cityFromContext]);
   const [files, setFiles] = useState<File[]>([]);
   const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);

@@ -11,8 +11,16 @@ import { useActiveTrip, useCities, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/add/$kind")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    city: typeof search["city"] === "string" ? (search["city"] as string) : undefined,
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    city?: string | undefined;
+    cityId?: string | undefined;
+    returnTo?: string | undefined;
+  } => ({
+    ...(typeof search["city"] === "string" ? { city: search["city"] } : {}),
+    ...(typeof search["cityId"] === "string" ? { cityId: search["cityId"] } : {}),
+    ...(typeof search["returnTo"] === "string" ? { returnTo: search["returnTo"] } : {}),
   }),
   head: () => ({
     meta: [
@@ -51,12 +59,17 @@ function nowLocal() {
 
 function AddEntry() {
   const { kind } = Route.useParams();
-  const { city: cityParam } = Route.useSearch();
+  const { city: cityParam, cityId: cityIdParam, returnTo } = Route.useSearch();
+  const initialCityId = cityIdParam ?? cityParam ?? null;
   const k: Kind = kind === "landmark" || kind === "restaurant" ? kind : "jot";
   const copy = COPY[k]!;
   const { trip } = useActiveTrip();
   const cities = useCities(trip?.id);
-  const [cityId, setCityId] = useState<string | null>(cityParam ?? null);
+  const [cityId, setCityId] = useState<string | null>(initialCityId);
+
+  useEffect(() => {
+    if (initialCityId) setCityId(initialCityId);
+  }, [initialCityId]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [when, setWhen] = useState(nowLocal);
@@ -79,6 +92,23 @@ function AddEntry() {
     else setWhen(nowLocal());
   }, [city?.start_date]);
 
+  function navigateAfterSave(savedId: string) {
+    const hash = `entry-${savedId}`;
+    const returnCityMatch = returnTo?.match(/^\/city\/([^/#?]+)/)?.[1];
+    const targetCityId = chosenCity ?? returnCityMatch ?? null;
+    if (targetCityId) {
+      navigate({
+        to: "/city/$cityId",
+        params: { cityId: targetCityId },
+        hash,
+      });
+    } else if (returnTo) {
+      navigate({ to: returnTo, hash });
+    } else {
+      navigate({ to: "/" });
+    }
+  }
+
   async function save() {
     const { data: auth } = await supabase.auth.getUser();
     const uid = auth.user?.id ?? null;
@@ -87,7 +117,7 @@ function AddEntry() {
     const occurredIso = (isNaN(occurred.getTime()) ? new Date() : occurred).toISOString();
 
     if (!uid) {
-      addGuestEntry({
+      const guestEntry = addGuestEntry({
         trip_id: trip?.id ?? null,
         city_id: chosenCity,
         kind: k,
@@ -109,8 +139,7 @@ function AddEntry() {
       });
       setBusy(false);
       await qc.invalidateQueries();
-      if (chosenCity) navigate({ to: "/city/$cityId", params: { cityId: chosenCity } });
-      else navigate({ to: "/" });
+      navigateAfterSave(guestEntry.id);
       return;
     }
 
@@ -140,13 +169,12 @@ function AddEntry() {
       void fetchGoogleRatings({ data: { entryIds: [saved.id] } })
         .then(() => qc.invalidateQueries())
         .catch(() => {});
-    if (error) {
-      toast.error(error.message);
+    if (error || !saved) {
+      toast.error(error?.message ?? "Could not save entry.");
       return;
     }
     await qc.invalidateQueries();
-    if (chosenCity) navigate({ to: "/city/$cityId", params: { cityId: chosenCity } });
-    else navigate({ to: "/" });
+    navigateAfterSave(saved.id);
   }
 
   return (

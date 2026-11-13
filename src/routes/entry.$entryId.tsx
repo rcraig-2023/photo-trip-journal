@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { Require } from "@/components/Require";
 import { Photo } from "@/components/Photo";
 import { deleteGuestEntries, updateGuestEntry } from "@/lib/guestStore";
-import { KIND_LABEL, PRICE_LABEL, fmtTime, useEntry, type Kind } from "@/lib/touri";
+import { KIND_LABEL, PRICE_LABEL, fmtTime, useCity, useEntry, type Kind } from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/entry/$entryId")({
@@ -31,6 +31,7 @@ export const Route = createFileRoute("/entry/$entryId")({
 function EntryPage() {
   const { entryId } = Route.useParams();
   const entry = useEntry(entryId);
+  const fallbackCity = useCity(entry.data?.city_id ?? undefined);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
@@ -61,6 +62,7 @@ function EntryPage() {
   if (!entry.data) return <div className="px-6 py-12 eyebrow">Loading…</div>;
   const e = entry.data;
   const isRateable = e.kind === "restaurant" || e.kind === "landmark";
+  const cityName = e.cities?.name ?? fallbackCity.data?.name ?? "Chapter";
 
   async function save() {
     const patch = {
@@ -82,7 +84,14 @@ function EntryPage() {
     if (entryId.startsWith("guest-")) {
       updateGuestEntry(entryId, patch);
       toast.success("Saved");
-      qc.invalidateQueries();
+      await qc.invalidateQueries();
+      if (e.city_id) {
+        navigate({
+          to: "/city/$cityId",
+          params: { cityId: e.city_id },
+          hash: `entry-${e.id}`,
+        });
+      }
       return;
     }
     const { error } = await supabase
@@ -92,7 +101,14 @@ function EntryPage() {
     if (error) toast.error(error.message);
     else {
       toast.success("Saved");
-      qc.invalidateQueries();
+      await qc.invalidateQueries();
+      if (e.city_id) {
+        navigate({
+          to: "/city/$cityId",
+          params: { cityId: e.city_id },
+          hash: `entry-${e.id}`,
+        });
+      }
     }
   }
 
@@ -100,30 +116,63 @@ function EntryPage() {
     if (entryId.startsWith("guest-")) {
       updateGuestEntry(entryId, { status: "planned" });
       toast.success("Back to planned.");
-      qc.invalidateQueries();
+      await qc.invalidateQueries();
+      if (e.city_id) {
+        navigate({
+          to: "/city/$cityId",
+          params: { cityId: e.city_id },
+          hash: `entry-${e.id}`,
+        });
+      }
       return;
     }
     // Status only — occurred_at keeps its scheduled date and time.
     const { error } = await supabase.from("entries").update({ status: "planned" }).eq("id", entryId);
     if (error) return void toast.error(error.message);
     toast.success("Back to planned.");
-    qc.invalidateQueries();
+    await qc.invalidateQueries();
+    if (e.city_id) {
+      navigate({
+        to: "/city/$cityId",
+        params: { cityId: e.city_id },
+        hash: `entry-${e.id}`,
+      });
+    }
   }
 
   async function remove() {
+    const targetCityId = e.city_id;
     if (entryId.startsWith("guest-")) {
       deleteGuestEntries([entryId]);
-      qc.invalidateQueries();
-      navigate({ to: "/memories" });
+      await qc.invalidateQueries();
+      if (targetCityId) navigate({ to: "/city/$cityId", params: { cityId: targetCityId } });
+      else navigate({ to: "/memories" });
       return;
     }
     await supabase.from("entries").delete().eq("id", entryId);
-    qc.invalidateQueries();
-    navigate({ to: "/memories" });
+    await qc.invalidateQueries();
+    if (targetCityId) navigate({ to: "/city/$cityId", params: { cityId: targetCityId } });
+    else navigate({ to: "/memories" });
   }
 
   return (
     <div>
+      <div className="px-6 pt-10 pb-4">
+        {e.city_id ? (
+          <Link
+            to="/city/$cityId"
+            params={{ cityId: e.city_id }}
+            hash={`entry-${e.id}`}
+            className="eyebrow inline-block hover:text-accent"
+          >
+            ← Back to {cityName}
+          </Link>
+        ) : (
+          <Link to="/memories" className="eyebrow inline-block hover:text-accent">
+            ← Back to Memories
+          </Link>
+        )}
+      </div>
       {!!e.entry_photos?.length && (
         <Photo path={e.entry_photos[0]?.storage_path} alt={e.title ?? "Memory"} className="aspect-[4/5] w-full" />
       )}

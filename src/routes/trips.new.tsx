@@ -89,7 +89,7 @@ function NewTrip() {
       .slice(0, access.limits.maxCitiesPerTrip);
 
     if (!uid) {
-      createGuestTrip({
+      const createdTrip = createGuestTrip({
         title: title.trim(),
         start_date: start || null,
         end_date: end || null,
@@ -104,7 +104,8 @@ function NewTrip() {
       });
       await qc.invalidateQueries();
       setBusy(false);
-      navigate({ to: "/trip" });
+      navigate({ to: "/trip", search: { overview: undefined } });
+      void createdTrip;
       return;
     }
 
@@ -142,7 +143,7 @@ function NewTrip() {
 
     await qc.invalidateQueries();
     setBusy(false);
-    navigate({ to: "/trip" });
+    navigate({ to: "/trip", search: { overview: undefined } });
   }
 
   return (

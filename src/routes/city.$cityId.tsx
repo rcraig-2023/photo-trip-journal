@@ -1,14 +1,26 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Share2 } from "lucide-react";
+import { createFileRoute, Link, useLocation } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Lock, Share2 } from "lucide-react";
+import { AddCityDialog } from "@/components/AddCityDialog";
 import { AppShell } from "@/components/AppShell";
 import { EditorialPhotoMosaic } from "@/components/EditorialPhotoMosaic";
 import { Require } from "@/components/Require";
 import { PhotoGrid } from "@/components/PhotoGrid";
 import { RankedPlaceCard } from "@/components/RankedPlaceCard";
-import { GhostEntry, SavedIdeas } from "@/components/Planned";
+import { GhostEntry, ItineraryImporter, SavedIdeas } from "@/components/Planned";
 import { ShareCityGuideDialog } from "@/components/ShareCityGuideDialog";
-import { fmtRange, fmtTime, useCity, useEntries, type Kind } from "@/lib/touri";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
+import { TIER_LIMITS, useTierAccess } from "@/lib/tiers";
+import {
+  fmtRange,
+  fmtTime,
+  useActiveTrip,
+  useCities,
+  useCity,
+  useEntries,
+  useTrips,
+  type Kind,
+} from "@/lib/touri";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/city/$cityId")({
@@ -48,9 +60,47 @@ const FILTERS: { key: Kind | "all"; label: string }[] = [
 function CityPage() {
   const { cityId } = Route.useParams();
   const city = useCity(cityId);
+  const { trip: activeTrip } = useActiveTrip();
+  const allTrips = useTrips();
+  const tripId = city.data?.trip_id ?? activeTrip?.id;
+  const tripForCity =
+    (allTrips.data ?? []).find((t) => t.id === tripId) ?? activeTrip ?? null;
+  const tripCities = useCities(tripId);
+  const access = useTierAccess(tripId);
   const entries = useEntries({ cityId });
   const [filter, setFilter] = useState<Kind | "all">("all");
   const [shareOpen, setShareOpen] = useState(false);
+  const [addCityOpen, setAddCityOpen] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const hash = useLocation({ select: (l) => l.hash });
+
+  const isSingleCityTrip = (tripCities.data?.length ?? 0) === 1;
+
+  useEffect(() => {
+    const cleanHash = hash.replace(/^#/, "");
+    if (!cleanHash.startsWith("entry-") || entries.isLoading) return;
+    const entryId = cleanHash.slice("entry-".length);
+    if (!entryId) return;
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`entry-${entryId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightedId(entryId);
+      }
+    }, 80);
+
+    const clearTimer = window.setTimeout(() => {
+      setHighlightedId((curr) => (curr === entryId ? null : curr));
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [hash, entries.isLoading, entries.data?.length]);
 
   const shareableEntries = (entries.data ?? [])
     .filter(
@@ -85,18 +135,37 @@ function CityPage() {
   return (
     <div>
       <header className="px-6 pt-12">
-        <Link to="/trip" className="eyebrow">
-          ← Trip
-        </Link>
+        {isSingleCityTrip ? (
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <span className="eyebrow">
+              {tripForCity?.title ?? city.data?.trips?.title ?? "Current trip"}
+            </span>
+            <Link
+              to="/trip"
+              search={{ overview: "1" }}
+              className="eyebrow underline underline-offset-4"
+            >
+              Switch Trip →
+            </Link>
+          </div>
+        ) : (
+          <Link to="/trip" className="eyebrow">
+            ← Trip
+          </Link>
+        )}
         <h1 className="display mt-5 text-[3.4rem]">{city.data?.name ?? ""}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {city.data?.country ? `${city.data.country} · ` : ""}
           {fmtRange(city.data?.start_date, city.data?.end_date)}
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-5">
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2.5">
           <Link
             to="/add/photos"
-            search={{ city: cityId }}
+            search={{
+              city: cityId,
+              cityId,
+              returnTo: `/city/${cityId}`,
+            }}
             className="inline-block text-xs uppercase tracking-[0.14em] text-accent"
           >
             + Add photos here
@@ -110,6 +179,49 @@ function CityPage() {
               <Share2 className="size-3.5" /> Share {city.data?.name ?? "City"} List
             </button>
           )}
+          {isSingleCityTrip && tripForCity && (
+            <>
+              <ItineraryImporter
+                trip={tripForCity}
+                cities={tripCities.data ?? (city.data ? [city.data] : [])}
+                label="Paste Itinerary"
+                className="mt-0 tracking-[0.14em]"
+              />
+              <Link
+                to="/trip/$tripId/export"
+                params={{ tripId: tripForCity.id }}
+                className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.14em] text-accent"
+              >
+                Export Album
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  if (access.canAddCity) {
+                    setAddCityOpen(true);
+                  } else {
+                    setUpgradeReason(
+                      !access.isAuthenticated
+                        ? "Guest preview includes 1 city chapter. Create a free account or unlock a Trip Pass to plan multi-city journeys."
+                        : `Free Explorer includes ${TIER_LIMITS.free.maxCitiesPerTrip} city chapter per trip. Unlock a Single Trip Pass ($9) or Touri Pro ($29/yr) to add unlimited cities.`,
+                    );
+                    setUpgradeOpen(true);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.14em] text-accent"
+              >
+                + Add City
+                {!access.canAddCity && <Lock className="size-3" />}
+              </button>
+              <Link
+                to="/trip"
+                search={{ overview: "1" }}
+                className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
+              >
+                Switch Trip
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -118,6 +230,23 @@ function CityPage() {
         onOpenChange={setShareOpen}
         entries={shareableEntries}
         initialCityId={cityId}
+      />
+
+      <AddCityDialog
+        open={addCityOpen}
+        onOpenChange={setAddCityOpen}
+        trip={tripForCity}
+      />
+
+      <UpgradeDialog
+        open={upgradeOpen}
+        onOpenChange={(next) => {
+          setUpgradeOpen(next);
+          if (!next) setUpgradeReason(null);
+        }}
+        tripId={tripForCity?.id}
+        tripTitle={tripForCity?.title}
+        reason={upgradeReason}
       />
 
 
@@ -152,7 +281,15 @@ function CityPage() {
           </h2>
           <ol className="mt-2">
             {list.map((e) => (
-              <li key={e.id} className="px-6">
+              <li
+                key={e.id}
+                id={`entry-${e.id}`}
+                className={cn(
+                  "scroll-mt-24 px-6 transition-all duration-500",
+                  highlightedId === e.id &&
+                    "bg-accent/5 ring-2 ring-inset ring-accent/70",
+                )}
+              >
                 {e.status === "planned" ? (
                   <GhostEntry entry={e} />
                 ) : e.kind === "restaurant" || e.kind === "landmark" ? (
